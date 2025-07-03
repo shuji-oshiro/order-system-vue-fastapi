@@ -1,0 +1,25 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi",
+    "ffmpeg>=1.4",
+    "openai",
+    "openai-whisper",
+    "pydantic[email]>=2.11.7",
+    "pykakasi",
+    "pytest>=8.4.0",
+    "python-dotenv",
+    "python-multipart",
+    "rapidfuzz",
+    "scipy>=1.16.0",
+    "sounddevice>=0.5.2",
+    "uvicorn",
+    "vosk>=0.3.45",
+]
+
+[tool.uv.sources]
+openai-whisper = { git = "https://github.com/openai/whisper.git" }
