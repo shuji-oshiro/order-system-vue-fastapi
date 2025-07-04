@@ -12,7 +12,9 @@ if not os.path.exists(data_dir):
 
 DATABASE_URL = "sqlite:///./backend/data/store_database.db"  # ← ファイルで保存
 if is_running_under_pytest():
-        # usersテストで仕様するmemory database fileを削除する
+
+    # pytest実行中の場合は、メモリ内データベースを使用
+    # usersテストで使用するmemory database fileを削除し初期化
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(script_dir, "../../data/.file")
