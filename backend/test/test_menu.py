@@ -11,9 +11,9 @@ def test_get_menu_by_id_not_found():
     response = client.get("/menu/1")
     assert response.status_code == 404
 
-
+testDatapath = "backend/test/testdata/testdata_menudata.csv"
 def test_import_menu():
-    with open("backend/test/test_menudata.csv", "rb") as f:
+    with open(testDatapath, "rb") as f:
         response = client.post("/menu", files={"file": f})
 
     assert response.status_code == 200
@@ -21,7 +21,7 @@ def test_import_menu():
     assert len(data) == 50  # CSVからメニューが読み込まれたことを確認
 
 def test_import_menu2():
-    with open("backend/test/test_menudata.csv", "rb") as f:
+    with open(testDatapath, "rb") as f:
         response = client.post("/menu", files={"file": f})
     assert response.status_code == 500
 
