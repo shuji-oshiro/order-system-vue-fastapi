@@ -12,7 +12,7 @@
 - Whisper | vosk
 
 ## 環境
-- Python 3.11+
+- Python 3.13+
 - Node.js 18+
 - `uv` (`pip install uv`)
 - `npm` / `pnpm`
