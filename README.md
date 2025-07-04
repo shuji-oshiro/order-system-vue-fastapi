@@ -29,7 +29,7 @@ git clone ...
 cd project/vuetify-pj-order_control
 python main.py
 
-```markdown
+```
 
 ## 🚧 開発ステータス
 
