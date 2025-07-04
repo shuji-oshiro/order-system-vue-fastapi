@@ -19,11 +19,11 @@ def is_running_under_pytest():
     return "pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") is not None
 
 # backend/dataフォルダが存在しない場合は作成
-data_dir = "./data"
+data_dir = "backend/data"
 if not os.path.exists(data_dir):
     os.makedirs(data_dir, exist_ok=True)
 
-DATABASE_URL = "sqlite:///./data/store_database.db"
+DATABASE_URL = "sqlite:///./backend/data/store_database.db"
 
 # SQLAlchemy が DBと通信するためのエンジンを作成
 engine = create_engine(
