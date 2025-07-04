@@ -1,32 +1,34 @@
+# OS・エディタ固有ファイル
 .DS_Store
-node_modules/
-dist/
-data/
-
-# local env files
-.env.local
-.env.*.local
-
-# Log files
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Editor directories and files
-.idea
-.vscode
+.idea/
+.vscode/              # 自動テスト実行用に管理。必要に応じてコメントアウト調整
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-uploads
-converted
-file
-.pytest_cache
+# 依存ファイル・ビルド成果物
+node_modules/
+dist/
+__pycache__/
+.pytest_cache/
 
+# ログファイル
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 環境設定ファイル（ローカル）
+.env.local
+.env.*.local
+
+# アップロード・変換関連の一時ファイル
+uploads/
+converted/
+file/
 temp.webm
 
-models
+# データファイル（プロジェクト固有）
+data/

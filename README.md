@@ -18,8 +18,10 @@
 ## デモ
 
 ```bash
-git clone ...
-npm run dev
+cd order-system-vue-fastapi \
+&& (cd backend && uv sync) \
+&& npm install \
+&& (cd frontend && npm install && npm run dev)
 ```
 
 ## 開発ステータス

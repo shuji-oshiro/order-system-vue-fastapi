@@ -17,6 +17,7 @@ dependencies = [
     "rapidfuzz",
     "scipy>=1.16.0",
     "sounddevice>=0.5.2",
+    "sqlalchemy>=2.0.41",
     "uvicorn",
     "vosk>=0.3.45",
 ]
