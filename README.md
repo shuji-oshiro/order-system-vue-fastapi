@@ -24,10 +24,7 @@
 ## デモ
 
 ```bash
-cd order-system-vue-fastapi \
-&& (cd backend && .venv/Scripts/activate && uv sync) \
-&& npm install \
-&& (cd frontend && npm install && npm run dev)
+setup.sh
 ```
 
 ## 開発ステータス
