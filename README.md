@@ -2,7 +2,7 @@
 
 ## 概要
 
-飲食店向けの注文管理のプロトタイプ  
+飲食店向けの注文管理アプリケーションのプロトタイプです。  
 音声認識、レコメンド機能、Vuetifyによるモダンなデザインの機能検証
 
 ## 特徴
@@ -21,11 +21,23 @@
 ## スクリーンショット
 
 
-## デモ
+## デモ 仮想環境
 
 ```bash
+python -m venv .venv
+source backend/.venv/Scripts/activate
+
+source backend/.venv/Scripts/activate  # Windows (Git Bash)
+source backend/.venv/bin/activate       # macOS/Linux"
+
 setup.sh
+
+npm run dev
 ```
+
+## 初期起動時はスクリプトダミーデータを追加
+python backend/scripts/insert_test_data.py
+
 
 ## 開発ステータス
 
