@@ -1,15 +1,21 @@
 # order-system-vue-fastapi
 
-## 概要（What）
+## 概要
 
 飲食店向けの注文管理のプロトタイプ  
 音声認識、レコメンド機能、Vuetifyによるモダンなデザインの機能検証
 
-## 特徴（Why）
+## 特徴
 
 - Vue 3 + Vuetify 
 - FastAPI + SQLite + SQLAlchemy
 - Whisper | vosk
+
+## 環境
+- Python 3.11+
+- Node.js 18+
+- `uv` (`pip install uv`)
+- `npm` / `pnpm`
 
 
 ## スクリーンショット
@@ -19,7 +25,7 @@
 
 ```bash
 cd order-system-vue-fastapi \
-&& (cd backend && uv sync) \
+&& (cd backend && .venv/Scripts/activate && uv sync) \
 && npm install \
 && (cd frontend && npm install && npm run dev)
 ```
