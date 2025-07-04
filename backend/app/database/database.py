@@ -6,6 +6,11 @@ from backend.app.utils.utils import is_running_under_pytest
 
 # SQLiteを使用する場合は、ファイルパスを指定します。
 
+# dataフォルダが存在しない場合は作成
+data_dir = "./backend/data"
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir, exist_ok=True)
+
 DATABASE_URL = "sqlite:///./backend/data/store_database.db"  # ← ファイルで保存
 if is_running_under_pytest():
         # usersテストで仕様するmemory database fileを削除する
