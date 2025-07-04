@@ -33,11 +33,10 @@ source backend/.venv/bin/activate       # macOS/Linux"
 setup.sh
 
 npm run dev
+
+python backend/scripts/insert_test_data.py　# 初期起動時はスクリプトダミーデータを追加
+
 ```
-
-## 初期起動時はスクリプトダミーデータを追加
-python backend/scripts/insert_test_data.py
-
 
 ## 開発ステータス
 
