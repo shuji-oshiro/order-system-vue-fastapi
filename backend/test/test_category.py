@@ -27,7 +27,7 @@ def test_add_category():
         }, 
         {
             "id": 5,  
-            "name": "フルーツ",
+            "name": "フルーツ1",
             "description": "フルーツの説明"    
         }       
     ])
