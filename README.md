@@ -19,9 +19,7 @@
 
 ```bash
 git clone ...
-cd project/vuetify-pj-order_control
-python main.py
-
+npm run dev
 ```
 
 ## 開発ステータス
