@@ -27,8 +27,8 @@ def test_add_category():
         }, 
         {
             "id": 5,  
-            "name": "フルーツポンチ",
-            "description": "フルーツポンチの説明"    
+            "name": "フルーツ",
+            "description": "フルーツの説明"    
         }       
     ])
     assert response.status_code == 200
