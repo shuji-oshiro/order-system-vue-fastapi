@@ -52,3 +52,19 @@ python backend/scripts/insert_test_data.py
 
 **Shuji Oshiro**  
 - GitHub: [@shuji-oshiro](https://github.com/shuji-oshiro)  
+
+##ライセンス情報
+
+本プロジェクトは [MIT License](./LICENSE) のもとで公開されています。
+
+### 使用ライブラリとライセンス
+
+以下の外部ライブラリを使用しており、各ライセンス条件に従っています。
+
+- [Whisper (OpenAI)](https://github.com/openai/whisper) - MIT License
+- [Vosk (AlphaCep)](https://github.com/alphacep/vosk-api) - Apache License 2.0
+- [Vuetify](https://github.com/vuetifyjs/vuetify) - MIT License
+- [ffmpeg](https://ffmpeg.org/) - LGPL/GPL ライセンス（再配布時に注意）
+- その他：FastAPI, SQLAlchemy, sounddevice なども MIT / Apache系
+
+詳細は各ライブラリの公式ページおよび `LICENSE`, `NOTICE` を参照してください。
