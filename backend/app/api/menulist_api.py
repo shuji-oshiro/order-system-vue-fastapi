@@ -34,7 +34,7 @@ def get_all_menus_for_category(db: Session = Depends(get_db)):
                 MenuOut_SP(
                     category_id=category_id,
                     category_name=category_name,
-                    menues=menus
+                    menus=menus  # menues -> menus に修正
                 )
             )
         return menu_out_list

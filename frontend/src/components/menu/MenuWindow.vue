@@ -11,7 +11,7 @@
     <div style="max-height: 90vh; overflow-y: auto; overflow-x: hidden;">
         <v-row dense>
           <v-col
-            v-for="menu in menuGroup.menues"
+            v-for="menu in menuGroup.menus"
             :key="menu.id"
             cols="12"
           >

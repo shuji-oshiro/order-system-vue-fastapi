@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from backend.app.schemas.menu_schema import MenuOut
+from .menu_schema import MenuOut
 
 class MatchMenu(BaseModel):
     menu: MenuOut

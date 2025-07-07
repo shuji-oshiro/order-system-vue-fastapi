@@ -20,7 +20,7 @@ export type MenuOut = {
 export type MenuOut_GP = {
   category_id: number
   category_name: string
-  menues: MenuOut[]
+  menus: MenuOut[]
 }
 
 // カテゴリ情報

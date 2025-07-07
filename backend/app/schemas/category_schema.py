@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from .baseSchema import BaseSchema
 
 
@@ -8,7 +8,8 @@ class CategoryBase(BaseSchema):
     name: str = Field(..., min_length=1, max_length=100, description="カテゴリ名")
     description: Optional[str] = Field(None, max_length=500, description="カテゴリの説明")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         if not v or v.strip() == "":
             raise ValueError('カテゴリ名は必須です')
@@ -16,7 +17,8 @@ class CategoryBase(BaseSchema):
             raise ValueError('カテゴリ名は1文字以上である必要があります')
         return v.strip()
     
-    @validator('description')
+    @field_validator('description')
+    @classmethod
     def validate_description(cls, v):
         if v is not None:
             return v.strip() if v.strip() else None
@@ -41,7 +43,8 @@ class CategoryUpdate(BaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="カテゴリ名")
     description: Optional[str] = Field(None, max_length=500, description="カテゴリの説明")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         if v is not None:
             if not v or v.strip() == "":
@@ -51,7 +54,8 @@ class CategoryUpdate(BaseSchema):
             return v.strip()
         return v
     
-    @validator('description')
+    @field_validator('description')
+    @classmethod
     def validate_description(cls, v):
         if v is not None:
             return v.strip() if v.strip() else None
