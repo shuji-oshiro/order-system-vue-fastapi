@@ -111,7 +111,22 @@ def test_isolation(request):
         if marker and marker.args:
             # マーカーに引数がある場合はそのデータを使用
             setup_orders_testdata()
-    
+
+    elif "test_category" in test_file:
+        
+        # カテゴリテストの場合、カテゴリデータが必要
+        print(f"{test_name} - カテゴリデータをSQLファイルで準備中")
+        cleanup_all_testdata()
+
+
+        if marker and marker.args:
+            # マーカーに引数がある場合はそのデータを使用
+            setup_categories_testdata()
+        if "test_delete_category_with_menus" in test_name:
+            # メニューがある場合はメニューデータもセットアップ
+            setup_menus_testdata()
+
+
     # 特定のテストで個別の前処理が必要な場合
     if "test_get_orders_error" in test_name:
         # 注文がない状態でのテスト用（何もしない）

@@ -114,6 +114,9 @@
         order_cnt: item.order_cnt
       }))
 
+      // 注文をサーバーに送信
+      const response = await axios.post('http://localhost:8000/order', orders)
+
 
       commonEventStore.EventAlertInformation(
         AlertType.Success,
