@@ -1,3 +1,4 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
@@ -11,7 +12,7 @@ def test_get_menu_byid_notfound():
     response = client.get("/menu/1")
     assert response.status_code == 404
 
-testDatapath = "backend/test/testdata/testdata_menudata.csv"
+testDatapath = os.path.join(os.path.dirname(__file__), "testdata", "testdata_menudata.csv")
 def test_import_menus_ok():
     with open(testDatapath, "rb") as f:
         response = client.post("/menu", files={"file": f})
