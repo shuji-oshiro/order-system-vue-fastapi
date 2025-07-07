@@ -52,7 +52,7 @@
   async function getOrderInfo(orderId: number = 1) {
     try {
       // シート単位の現在の注文状況を取得
-      const response = await axios.get(`http://localhost:8000/order/${orderId}`)
+      const response = await axios.get(`/api/order/${orderId}`)
       rawOrders.value = response.data || []
 
     } catch (error) {

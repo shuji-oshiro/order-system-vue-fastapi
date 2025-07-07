@@ -35,7 +35,7 @@
   async function getCategoryInfo() {
     try {
       // カテゴリ単位の現在のメニュー状況を取得
-      const response = await axios.get(`http://localhost:8000/category`)
+      const response = await axios.get(`/api/category`)
       categories.value = response.data || []
 
     } catch (error) {

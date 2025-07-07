@@ -115,7 +115,7 @@
       }))
 
       // 注文をサーバーに送信
-      const response = await axios.post('http://localhost:8000/order', orders)
+      const response = await axios.post('/api/order', orders)
 
 
       commonEventStore.EventAlertInformation(

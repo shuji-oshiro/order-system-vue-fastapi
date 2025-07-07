@@ -30,7 +30,7 @@ const onFileChange = async () => {
 
 async function importMenus(formData: FormData) {
   try {
-    const response = await axios.post('http://localhost:8000/menu', formData)
+    const response = await axios.post('/api/menu', formData)
     commonEventStore.EventAlertInformation(AlertType.Success, "メニューの一括更新が完了しました")
   } catch (error) {
     if (axios.isAxiosError(error)) {

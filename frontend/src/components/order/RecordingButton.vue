@@ -121,7 +121,7 @@ async function startRecording() {
     const formData = new FormData()
     formData.append('file', blob, 'recording.webm')
     try {
-      const response = await axios.post('http://localhost:8000/voice', formData)
+      const response = await axios.post('/api/voice', formData)
       const voiceResult = response.data
 
       reco_text.value = voiceResult.reco_text

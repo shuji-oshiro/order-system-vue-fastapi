@@ -36,7 +36,7 @@
   async function getRecomendMenu() {
     try {
       // シート単位の現在の注文状況を取得
-      const response = await axios.get('http://localhost:8000/menu/category/1')
+      const response = await axios.get('/api/menu/category/1')
       recomend_menus.value = response.data || []
 
     } catch (error) {
