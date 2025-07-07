@@ -1,5 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
+
 
 client = TestClient(app)
 
@@ -46,15 +48,16 @@ def test_add_order2():
     data = response.json()
     assert len(data) == 2 # 2件の注文が追加されたことを確認
 
-
+@pytest.mark.db_setup(True)
 def test_get_orders():
     response = client.get("/order/2")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2 # 指定したシートの注文が2件のであることを確認
+    assert len(data) == 5 # 指定したシートの注文が2件のであることを確認
 
+@pytest.mark.db_setup(True)
 def test_delete_order():
     response = client.delete("/order/1")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 0 # 注文が1件削除されたことを確認
+    assert len(data) == 3 # 注文が1件削除されたことを確認

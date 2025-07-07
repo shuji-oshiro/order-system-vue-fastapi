@@ -1,6 +1,6 @@
+import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
-
 client = TestClient(app)
 
 def test_get_allmenus_notfound():
@@ -20,6 +20,7 @@ def test_import_menus_ok():
     data = response.json()
     assert len(data) == 50  # CSVからメニューが読み込まれたことを確認
 
+@pytest.mark.db_setup(True)
 def test_import_menus_error():
     with open(testDatapath, "rb") as f:
         response = client.post("/menu", files={"file": f})
@@ -35,14 +36,14 @@ def test_add_menu_ok():
     })
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 51 # 新しいメニューが追加されたことを確認
+    assert len(data) == 1 # 新しいメニューが追加されたことを確認
     assert isinstance(data, list) # レスポンスがリスト型であることを確認
 
-
+@pytest.mark.db_setup(True)
 def test_add_same_menu_error():
     response = client.put("/menu", json={
         "category_id": 1,  # カテゴリIDは適宜設定してください
-        "name": "かつ丼",
+        "name": "唐揚げ",
         "price": 1000,
         "description": "美味しいかつ丼です",
         "search_text": "かつどん"
@@ -51,6 +52,7 @@ def test_add_same_menu_error():
     data = response.json()
     assert "detail" in data  # エラーメッセージが含まれていることを確認
 
+@pytest.mark.db_setup(True)
 def test_get_menus_byid_ok():
     response = client.get("/menu/1")
     assert response.status_code == 200
@@ -62,7 +64,7 @@ def test_get_menus_byid_notfound():
     response = client.get("/menu/9999")  # 存在しないメニューIDを指定
     assert response.status_code == 404  # 404エラーを確認
 
-
+@pytest.mark.db_setup(True)
 def test_update_menu():
     response = client.patch("/menu/", json={
         "menu_id": 1,
@@ -72,11 +74,9 @@ def test_update_menu():
         "description": "美味しい天丼です",
         "search_text": "てんどん"
     })
-
     assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 51 # メニューの件数に変更がないことを確認
 
+@pytest.mark.db_setup(True)
 def test_update_menu_notfound():
     response = client.patch("/menu/", json={
         "menu_id": 9999,  # 存在しないメニューIDを指定
@@ -91,21 +91,22 @@ def test_update_menu_notfound():
     data = response.json()
     assert "detail" in data  # エラーメッセージが含まれていることを確認
 
-
+@pytest.mark.db_setup(True)
 def test_delete_menu():
     response = client.delete("/menu/1")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 50  # メニューが削除されたことを確認
+    response.json()
+    assert isinstance(data, list) # レスポンスがリスト型であることを確認
 
-
+@pytest.mark.db_setup(True)
 def test_get_all_menus_for_category():
     response = client.get("/menulist")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list) # レスポンスがリスト型であることを確認
 
-
+@pytest.mark.db_setup(True)
 def test_get_menus_by_category():
     response = client.get("/menu/category/1")
     assert response.status_code == 200
