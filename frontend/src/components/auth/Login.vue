@@ -50,8 +50,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
+
+// Emitの定義
+const emit = defineEmits(['login-status-changed'])
 
 const username = ref('')
 const password = ref('')
@@ -60,6 +63,11 @@ const userInfo = ref(null)
 const tokenExpiry = ref(null)
 const remainingTime = ref(0)
 const checkInterval = ref(null)
+
+// ログイン状態の変更を監視してイベントを発行
+watch(isLoggedIn, (newValue) => {
+  emit('login-status-changed', newValue)
+}, { immediate: true })
 
 // トークンの有効性をチェック
 const isTokenValid = computed(() => {
@@ -87,6 +95,8 @@ const formatRemainingTime = computed(() => {
 // ログイン状態を初期化
 onMounted(() => {
   checkLoginStatus()
+  // 初期状態でもイベントを発行
+  emit('login-status-changed', isLoggedIn.value)
 })
 
 // リアルタイムで残り時間を更新
