@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "bcrypt==3.2.0",
     "fastapi",
     "ffmpeg>=1.4",
     "openai",
