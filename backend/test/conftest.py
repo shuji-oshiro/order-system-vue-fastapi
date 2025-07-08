@@ -79,7 +79,6 @@ def execute_sql_file(sql_filename):
         raise
 
 
-
 # 個別テスト関数用のクリーンアップフィクスチャ
 @pytest.fixture(autouse=True)
 def test_isolation(request):
@@ -118,13 +117,16 @@ def test_isolation(request):
         print(f"{test_name} - カテゴリデータをSQLファイルで準備中")
         cleanup_all_testdata()
 
-
         if marker and marker.args:
             # マーカーに引数がある場合はそのデータを使用
             setup_categories_testdata()
         if "test_delete_category_with_menus" in test_name:
             # メニューがある場合はメニューデータもセットアップ
             setup_menus_testdata()
+
+    elif "test_auth" in test_file:
+        # 認証テストの場合
+        pass
 
 
     # 特定のテストで個別の前処理が必要な場合
