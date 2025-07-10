@@ -11,7 +11,7 @@
 - passlib: パスワードハッシュ化（bcrypt使用）
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 import os
@@ -48,16 +48,20 @@ def create_access_token(data: dict):
     
     処理の流れ:
     1. 入力データをコピー（元データを変更しないため）
-    2. 現在時刻＋有効期限分を計算して有効期限を設定
+    2. 現在時刻（UTC）＋有効期限分を計算して有効期限を設定
     3. 有効期限をペイロードに追加（"exp"フィールド）
     4. SECRET_KEYを使用してJWTトークンを署名・生成
+    
+    注意:
+    - タイムゾーン対応のためdatetime.now(timezone.utc)を使用
+    - 非推奨のdatetime.utcnow()は使用しない
     
     例:
         token = create_access_token({"sub": "testuser"})
         # 生成されるトークン: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
     """
     to_encode = data.copy()  # 元のdataを変更しないようにコピー
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})  # 有効期限をペイロードに追加
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 

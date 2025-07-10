@@ -21,7 +21,7 @@
             </v-card-actions>
           </v-card>
         </v-dialog>
-        <v-dialog v-model="showMonitoring" max-width="600px" persistent>
+        <v-dialog v-model="showMonitoring" max-width="1200px" persistent>
           <div class="d-flex justify-end pa-3">
             <v-btn @click="showMonitoring = false" color="primary">閉じる</v-btn>
           </div>

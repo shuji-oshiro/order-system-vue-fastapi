@@ -148,18 +148,29 @@ function checkLoginStatus() {
   }
 }
 
-// JWTトークンから有効期限を取得（テスト用に30秒に設定）
+// JWTトークンから有効期限を取得
 function getTokenExpiry(token) {
   try {
+    // JWTトークンのペイロード部分をデコード
     const payload = JSON.parse(atob(token.split('.')[1]))
     console.log('JWTペイロード:', payload)
-    // テスト用に強制的に30秒に設定
-    const testExpiry = new Date(Date.now() + 30 * 1000)
-    console.log('設定する有効期限:', testExpiry)
-    return testExpiry
+    
+    // JWTの'exp'フィールドから有効期限を取得（Unix timestamp）
+    if (payload.exp) {
+      const expiry = new Date(payload.exp * 1000) // Unix timestampをミリ秒に変換
+      console.log('JWTから取得した有効期限:', expiry)
+      return expiry
+    } else {
+      // 'exp'フィールドがない場合は現在時刻から1時間後をデフォルトに設定
+      console.warn('JWTに有効期限(exp)が含まれていません。デフォルト値を使用します。')
+      const defaultExpiry = new Date(Date.now() + 60 * 60 * 1000) // 1時間後
+      console.log('デフォルト有効期限:', defaultExpiry)
+      return defaultExpiry
+    }
   } catch (error) {
-    console.error('トークンの解析に失敗:', error)
-    const fallbackExpiry = new Date(Date.now() + 30 * 1000)
+    console.error('JWTトークンの解析に失敗:', error)
+    // エラーの場合は現在時刻から1時間後をフォールバックとして設定
+    const fallbackExpiry = new Date(Date.now() + 60 * 60 * 1000) // 1時間後
     console.log('フォールバック有効期限:', fallbackExpiry)
     return fallbackExpiry
   }
@@ -253,12 +264,36 @@ async function createTestUser() {
   }
 }
 
-// テスト用: トークン延長機能
+// テスト用: トークン延長機能（実際のJWT有効期限に基づいて延長）
 function extendToken() {
-  const newExpiry = new Date(Date.now() + 30 * 1000) // 30秒延長
-  localStorage.setItem('tokenExpiry', newExpiry.toISOString())
-  tokenExpiry.value = newExpiry.toISOString()
-  alert('トークンを30秒延長しました！')
+  const currentToken = localStorage.getItem('token')
+  if (!currentToken) {
+    alert('延長するトークンがありません')
+    return
+  }
+  
+  try {
+    // 現在のJWTから有効期限を取得
+    const payload = JSON.parse(atob(currentToken.split('.')[1]))
+    if (payload.exp) {
+      // 現在の有効期限から30分延長
+      const currentExpiry = new Date(payload.exp * 1000)
+      const newExpiry = new Date(currentExpiry.getTime() + 30 * 60 * 1000) // 30分延長
+      
+      localStorage.setItem('tokenExpiry', newExpiry.toISOString())
+      tokenExpiry.value = newExpiry.toISOString()
+      alert('トークンを30分延長しました！')
+    } else {
+      // expフィールドがない場合は現在時刻から30分後
+      const newExpiry = new Date(Date.now() + 30 * 60 * 1000)
+      localStorage.setItem('tokenExpiry', newExpiry.toISOString())
+      tokenExpiry.value = newExpiry.toISOString()
+      alert('トークンを30分延長しました！（現在時刻基準）')
+    }
+  } catch (error) {
+    console.error('トークン延長エラー:', error)
+    alert('トークンの延長に失敗しました')
+  }
 }
 
 // 認証が必要なAPIを呼び出す例
