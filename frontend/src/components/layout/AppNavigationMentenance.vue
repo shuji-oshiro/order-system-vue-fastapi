@@ -5,13 +5,12 @@
   >
   <Login @login-status-changed="handleLoginStatusChange" />
   <ImportCSVBtn v-if="isLoggedIn" />
+  <v-divider v-if="isLoggedIn" class="my-4"></v-divider>
   </v-navigation-drawer>  
 </template>
 
 <script setup lang="ts">
   import { ref } from 'vue'
-  import Login from '@/components/auth/Login.vue'
-  import ImportCSVBtn from '@/components/common/ImportCSVBtn.vue'
 
   const isNavigation = ref<boolean>(false)
   const isLoggedIn = ref<boolean>(false)

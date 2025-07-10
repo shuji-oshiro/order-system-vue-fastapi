@@ -11,6 +11,7 @@ dependencies = [
     "openai",
     "openai-whisper",
     "passlib[bcrypt]>=1.7.4",
+    "psutil>=5.9.0",
     "pydantic[email]>=2.11.7",
     "pykakasi",
     "pytest>=8.4.0",
@@ -21,6 +22,7 @@ dependencies = [
     "scipy>=1.16.0",
     "sounddevice>=0.5.2",
     "sqlalchemy>=2.0.41",
+    "starlette",
     "uvicorn",
     "vosk>=0.3.45",
 ]

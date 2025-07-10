@@ -8,19 +8,25 @@ from backend.app.api.auth.user_crud import get_user_password_by_username, create
 from backend.app.database.database import get_db
 from backend.app.api.auth.models import User
 from backend.app.api.auth.utils import get_password_hash
+from backend.app.utils.logging_config import get_logger
 
 router = APIRouter()
+logger = get_logger("auth")
 
 @router.post("/login", response_model=TokenResponse)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
+    logger.info(f"ログイン試行: {form_data.username}")
+    
     user = get_user_password_by_username(db, form_data.username)
     if not user or not verify_password(form_data.password, user.password):
+        logger.warning(f"ログイン失敗: {form_data.username}")
         raise HTTPException(status_code=400, detail="ユーザー名またはパスワードが不正です")
     
     token = create_access_token({"sub": user.username})
+    logger.info(f"ログイン成功: {form_data.username}")
     return {"access_token": token, "token_type": "bearer"}
 
 @router.post("/create_user", response_model=UserCreateResponse)

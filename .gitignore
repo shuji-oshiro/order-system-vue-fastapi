@@ -7,6 +7,7 @@
 *.njsproj
 *.sln
 *.sw?
+*.log
 
 # 依存ファイル・ビルド成果物
 node_modules/

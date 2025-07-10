@@ -16,6 +16,12 @@
     <v-icon>mdi-tools</v-icon>
     <span>メンテナンス</span>
     </v-btn>   
+
+    <v-btn @click="on_click(NavigationType.Monitoring)">
+    <v-icon>mdi-monitor-eye</v-icon>
+    <span>監視</span>
+    </v-btn>
+
     <RecordingButton />
   </v-bottom-navigation>
 </template>

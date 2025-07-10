@@ -21,6 +21,12 @@
             </v-card-actions>
           </v-card>
         </v-dialog>
+        <v-dialog v-model="showMonitoring" max-width="600px" persistent>
+          <div class="d-flex justify-end pa-3">
+            <v-btn @click="showMonitoring = false" color="primary">閉じる</v-btn>
+          </div>
+          <MonitoringDashboard />
+        </v-dialog>
         <MenuWindow @click="selectMenu" />
         <AppBottomNavigation @click="showNavigation" />
       </v-main>
@@ -39,6 +45,7 @@
   const isNavigationOrder = ref<boolean>(false)
   const isNavigationHistory = ref<boolean>(false)
   const isNavigationMaintenance = ref<boolean>(false)
+  const showMonitoring = ref<boolean>(false)
 
   const showAlert = ref(false)
   const alertType = ref<AlertType>(AlertType.Error)
@@ -73,6 +80,7 @@
     isNavigationOrder.value = false
     isNavigationHistory.value = false
     isNavigationMaintenance.value = false
+    showMonitoring.value = false
 
     if (target === NavigationType.Category) {
       isNavigationCategory.value = true
@@ -82,6 +90,8 @@
       isNavigationHistory.value = true
     } else if (target === NavigationType.Maintenance) {
       isNavigationMaintenance.value = true
+    } else if (target === NavigationType.Monitoring) {
+      showMonitoring.value = true
     }
   }
 
