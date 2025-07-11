@@ -63,6 +63,11 @@ def setup_logging():
                 "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
             }
         },
+        "filters": {
+            "uvicorn_access_filter": {
+                "()": UvicornAccessFilter
+            }
+        },
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
@@ -87,6 +92,16 @@ def setup_logging():
                 "maxBytes": 10485760,  # 10MB
                 "backupCount": 5,
                 "encoding": "utf-8"
+            },
+            "uvicorn_file": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "level": "INFO",
+                "formatter": "json",
+                "filename": log_dir / "app.log",
+                "maxBytes": 10485760,  # 10MB
+                "backupCount": 5,
+                "encoding": "utf-8",
+                "filters": ["uvicorn_access_filter"]
             }
         },
         "loggers": {
@@ -101,7 +116,7 @@ def setup_logging():
                 "propagate": False
             },
             "uvicorn.access": {
-                "handlers": ["file"],
+                "handlers": ["uvicorn_file"],
                 "level": "INFO",
                 "propagate": False
             }
@@ -121,3 +136,28 @@ def setup_logging():
 def get_logger(name: str) -> logging.Logger:
     """名前付きロガーを取得"""
     return logging.getLogger(f"backend.app.{name}")
+
+
+class UvicornAccessFilter(logging.Filter):
+    """Uvicornアクセスログから監視系エンドポイントを除外するフィルター"""
+    
+    EXCLUDED_PATHS = {
+        "/monitoring/health",
+        "/monitoring/health/simple",
+        "/monitoring/health/detailed",
+        "/monitoring/metrics",
+        "/monitoring/logs",
+        "/docs",
+        "/redoc",
+        "/openapi.json"
+    }
+    
+    def filter(self, record):
+        """監視系エンドポイントのアクセスログを除外"""
+        if hasattr(record, 'args') and record.args and len(record.args) >= 1:
+            # Uvicornのアクセスログフォーマット: "IP:PORT - \"METHOD PATH HTTP/1.1\" STATUS"
+            log_message = record.getMessage()
+            for excluded_path in self.EXCLUDED_PATHS:
+                if excluded_path in log_message:
+                    return False
+        return True

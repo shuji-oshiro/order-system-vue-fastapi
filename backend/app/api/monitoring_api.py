@@ -16,7 +16,7 @@ start_time = time.time()
 
 @router.get("/health")
 def health_check():
-    """基本的なヘルスチェック"""
+    """軽量なヘルスチェック（ログ・メトリクス対象外）"""
     try:
         return {
             "status": "healthy",
@@ -24,8 +24,14 @@ def health_check():
             "uptime": round(time.time() - start_time, 2)
         }
     except Exception as e:
-        logger.error("ヘルスチェックエラー", exc_info=True)
+        # 軽量化のためログ出力は最小限に
         raise HTTPException(status_code=503, detail="Service unavailable")
+
+
+@router.get("/health/simple")
+def simple_health_check():
+    """最軽量なヘルスチェック（監視システム用）"""
+    return {"status": "ok"}
 
 
 @router.get("/health/detailed")
