@@ -66,7 +66,7 @@
   onMounted(async () => {
     try {
       // 初期メニューの取得
-      const response = await axios.get('/api/menulist')
+      const response = await axios.get('/api/menulist/')
       groupedMenus.value = response.data || []
         
     } catch (error) {
