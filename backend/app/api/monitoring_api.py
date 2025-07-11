@@ -87,7 +87,18 @@ def get_metrics():
     """アプリケーションメトリクス"""
     try:
         # ミドルウェアからメトリクスを取得
-        app_metrics = metrics_middleware.get_metrics()
+        try:
+            from backend.app.middleware.logging_middleware import MetricsMiddleware
+            app_metrics = MetricsMiddleware.get_metrics()
+        except Exception as metrics_error:
+            logger.warning(f"メトリクス取得に失敗しました: {metrics_error}")
+            app_metrics = {
+                "request_count": 0,
+                "error_count": 0,
+                "error_rate": 0,
+                "average_response_time": 0,
+                "note": "メトリクス取得失敗"
+            }
         
         # システムメトリクス（基本版）
         import os
@@ -110,7 +121,7 @@ def get_metrics():
         
     except Exception as e:
         logger.error("メトリクス取得エラー", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get metrics")
+        raise HTTPException(status_code=500, detail=f"Failed to get metrics: {str(e)}")
 
 
 @router.get("/logs")

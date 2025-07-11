@@ -30,6 +30,8 @@ source backend/.venv/Scripts/activate
 source backend/.venv/Scripts/activate  # Windows (Git Bash)
 source backend/.venv/bin/activate       # macOS/Linux"
 
+cp .env.example .env　 #開発用の環境変数コピー
+
 setup.sh
 
 npm run dev

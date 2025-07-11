@@ -75,11 +75,13 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 class MetricsMiddleware(BaseHTTPMiddleware):
     """メトリクス収集ミドルウェア"""
     
+    # クラス変数でメトリクスを管理（全インスタンス共通）
+    _request_count = 0
+    _error_count = 0
+    _total_response_time = 0.0
+    
     def __init__(self, app):
         super().__init__(app)
-        self.request_count = 0
-        self.error_count = 0
-        self.total_response_time = 0.0
         
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         start_time = time.time()
@@ -87,38 +89,40 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             
-            # メトリクス更新
-            self.request_count += 1
+            # メトリクス更新（クラス変数を使用）
+            MetricsMiddleware._request_count += 1
             response_time = time.time() - start_time
-            self.total_response_time += response_time
+            MetricsMiddleware._total_response_time += response_time
             
             if response.status_code >= 400:
-                self.error_count += 1
+                MetricsMiddleware._error_count += 1
                 
             return response
             
         except Exception as e:
-            self.request_count += 1
-            self.error_count += 1
+            MetricsMiddleware._request_count += 1
+            MetricsMiddleware._error_count += 1
             response_time = time.time() - start_time
-            self.total_response_time += response_time
+            MetricsMiddleware._total_response_time += response_time
             raise
     
-    def get_metrics(self):
+    @classmethod
+    def get_metrics(cls):
         """現在のメトリクスを取得"""
         avg_response_time = (
-            self.total_response_time / self.request_count 
-            if self.request_count > 0 
+            cls._total_response_time / cls._request_count 
+            if cls._request_count > 0 
             else 0
         )
         
         return {
-            "request_count": self.request_count,
-            "error_count": self.error_count,
-            "error_rate": self.error_count / self.request_count if self.request_count > 0 else 0,
+            "request_count": cls._request_count,
+            "error_count": cls._error_count,
+            "error_rate": cls._error_count / cls._request_count if cls._request_count > 0 else 0,
             "average_response_time": round(avg_response_time * 1000, 2)  # ミリ秒
         }
 
-
-# グローバルメトリクスインスタンス
-metrics_middleware = MetricsMiddleware(None)
+# グローバルメトリクスアクセス用（後方互換性のため）
+metrics_middleware = type('MetricsProxy', (), {
+    'get_metrics': lambda: MetricsMiddleware.get_metrics()
+})()

@@ -5,7 +5,7 @@ from backend.app.database import database
 from backend.app.api import menu_api, order_api, category_api, menulist_api, voice_api, monitoring_api
 from backend.app.api.auth import routes as auth_routes
 from backend.app.utils.logging_config import setup_logging, get_logger
-from backend.app.middleware.logging_middleware import LoggingMiddleware, metrics_middleware
+from backend.app.middleware.logging_middleware import LoggingMiddleware, MetricsMiddleware
 
 # ログシステムを初期化
 setup_logging()
@@ -32,8 +32,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# メトリクスミドルウェアを設定
-metrics_middleware.app = app
+# メトリクスミドルウェアを追加
+app.add_middleware(MetricsMiddleware)
 
 # ルーター登録
 # ルーターを登録して、各APIエンドポイントを設定します。
