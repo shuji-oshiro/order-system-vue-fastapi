@@ -22,14 +22,14 @@ load_dotenv()
 
 # JWT設定
 # 環境変数から読み取り、デフォルト値を設定
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")  # JWTの署名・検証に使用する秘密鍵
-ALGORITHM = os.getenv("ALGORITHM", "HS256")  # JWT署名アルゴリズム（HMAC SHA-256）
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))  # アクセストークンの有効期限（分）
+SECRET_KEY = os.getenv("SECRET_KEY","no-secret-key") # JWTの署名・検証に使用する秘密鍵
+ALGORITHM = os.getenv("ALGORITHM", "HS256") # JWT署名アルゴリズム（HMAC SHA-256）
+ACCESS_TOKEN_EXPIRE_MINUTES:int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES",30))  # アクセストークンの有効期限（分）
 
-# 開発環境での警告表示
-if SECRET_KEY == "your-secret-key":
-    print("警告: SECRET_KEYがデフォルト値のままです。本番環境では必ず変更してください。")
-    print(".envファイルで SECRET_KEY=強力なランダム文字列 を設定してください。")
+
+if SECRET_KEY == "no-secret-key":
+    raise ValueError(f"環境変数 'SECRET_KEY' が設定されていません。 .env ファイルを確認してください。")
+
 
 # パスワードハッシュ化のコンテキスト
 # bcryptアルゴリズムを使用してパスワードを安全にハッシュ化
