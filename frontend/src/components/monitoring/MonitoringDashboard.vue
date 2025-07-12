@@ -7,7 +7,7 @@
           <v-card-text>
             <v-row>
               <!-- ヘルスステータス -->
-              <v-col cols="12" md="6">
+              <v-col cols="12" md="4">
                 <v-card variant="outlined">
                   <v-card-title>システムヘルス</v-card-title>
                   <v-card-text>
@@ -28,25 +28,29 @@
               </v-col>
 
               <!-- メトリクス -->
-              <v-col cols="12" md="6">
+              <v-col cols="12" md="8">
                 <v-card variant="outlined">
                   <v-card-title>アプリケーションメトリクス</v-card-title>
                   <v-card-text>
                     <div class="d-flex justify-space-between">
-                      <span>リクエスト数:</span>
-                      <strong>{{ metrics.application?.request_count || 0 }}</strong>
+                      <span>リクエスト数（総計）:</span>
+                      <strong>{{ metrics.application?.total?.request_count || 0 }}</strong>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span>ビジネスリクエスト数:</span>
+                      <strong>{{ metrics.application?.business?.request_count || 0 }}</strong>
                     </div>
                     <div class="d-flex justify-space-between">
                       <span>エラー数:</span>
-                      <strong>{{ metrics.application?.error_count || 0 }}</strong>
+                      <strong>{{ metrics.application?.total?.error_count || 0 }}</strong>
                     </div>
                     <div class="d-flex justify-space-between">
                       <span>エラー率:</span>
-                      <strong>{{ formatPercent(metrics.application?.error_rate) }}%</strong>
+                      <strong>{{ formatPercent(metrics.application?.total?.error_rate) }}%</strong>
                     </div>
                     <div class="d-flex justify-space-between">
                       <span>平均応答時間:</span>
-                      <strong>{{ metrics.application?.average_response_time || 0 }}ms</strong>
+                      <strong>{{ metrics.application?.total?.average_response_time || 0 }}ms</strong>
                     </div>
                   </v-card-text>
                 </v-card>
