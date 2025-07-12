@@ -27,8 +27,8 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256") # JWT署名アルゴリズム（HMAC
 ACCESS_TOKEN_EXPIRE_MINUTES:int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES",30))  # アクセストークンの有効期限（分）
 
 
-# if SECRET_KEY == "no-secret-key":
-#     raise ValueError(f"環境変数 'SECRET_KEY' が設定されていません。 .env ファイルを確認してください。")
+if SECRET_KEY == "no-secret-key":
+    print("警告: 環境変数 'SECRET_KEY' が設定されていません。 .env ファイルを確認してください。")
 
 
 # パスワードハッシュ化のコンテキスト
