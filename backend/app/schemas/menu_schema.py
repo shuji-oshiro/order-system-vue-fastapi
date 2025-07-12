@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, ConfigDict
 from decimal import Decimal
 from .baseSchema import BaseSchema
 
@@ -62,12 +62,11 @@ class MenuIn(MenuBase):
 
 class MenuOut(MenuBase):
     """メニュー出力スキーマ"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int = Field(..., description="メニューID")
     category_id: int = Field(..., description="カテゴリID")
     category: CategoryBase = Field(..., description="カテゴリ情報")
-    
-    class Config:
-        from_attributes = True
 
 
 class MenuUpdate(BaseSchema):
@@ -126,21 +125,19 @@ class MenuUpdateLegacy(BaseSchema):
 
 class MenuOut_SP(BaseSchema):
     """カテゴリ別メニューリスト出力スキーマ"""
+    model_config = ConfigDict(from_attributes=True)
+    
     category_id: int = Field(..., description="カテゴリID")
     category_name: str = Field(..., description="カテゴリ名")
     menus: List[MenuOut] = Field(..., description="メニューリスト")  # typo修正: menues -> menus
-    
-    class Config:
-        from_attributes = True
 
 
 class MenuSearchResult(BaseSchema):
     """メニュー検索結果スキーマ"""
+    model_config = ConfigDict(from_attributes=True)
+    
     menu: MenuOut = Field(..., description="メニュー情報")
     score: float = Field(..., ge=0.0, le=1.0, description="検索スコア")
-    
-    class Config:
-        from_attributes = True
 
 
 class MenuBulkCreateRequest(BaseSchema):
@@ -159,10 +156,9 @@ class MenuBulkCreateRequest(BaseSchema):
 
 class MenuBulkCreateResponse(BaseSchema):
     """メニュー一括作成レスポンススキーマ"""
+    model_config = ConfigDict(from_attributes=True)
+    
     created_count: int = Field(..., description="作成されたメニュー数")
     menus: List[MenuOut] = Field(..., description="作成されたメニューリスト")
-    
-    class Config:
-        from_attributes = True
 
 
