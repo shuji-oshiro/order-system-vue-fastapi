@@ -46,6 +46,10 @@ def setup_orders_testdata():
     """注文テストデータをセットアップ（INSERT）"""
     execute_sql_file("insert_orders.sql")
 
+def setup_recommend_orders_testdata():
+    """レコメンドテスト用注文データをセットアップ（INSERT）"""
+    execute_sql_file("insert_recommend_orders.sql")
+
 
 def execute_sql_file(sql_filename):
     """SQLファイルを読み込んで実行（最もシンプルな方式）"""
@@ -112,15 +116,21 @@ def test_isolation(request):
             setup_orders_testdata()
 
     elif "test_recommend" in test_file and test_name != "test_recommend_no_order_data":
-        # おすすめメニューテストの場合、カテゴリ、メニュー、注文データが必要
+        # おすすめメニューテストの場合、カテゴリ、メニュー、レコメンド用注文データが必要
         print(f"{test_name} - おすすめメニューテスト用データをSQLファイルで準備中")
         cleanup_all_testdata()
         setup_categories_testdata()
         setup_menus_testdata()
 
         if marker and marker.args:
-            # マーカーに引数がある場合はそのデータを使用
-            setup_orders_testdata()
+            # マーカーでrecommend_ordersが指定されている場合は専用データを使用
+            if "recommend_orders" in marker.args:
+                setup_recommend_orders_testdata()
+            else:
+                setup_orders_testdata()
+        else:
+            # デフォルトでレコメンド用データを使用
+            setup_recommend_orders_testdata()
 
     elif "test_category" in test_file:
         
