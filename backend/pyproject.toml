@@ -10,6 +10,7 @@ dependencies = [
     "ffmpeg>=1.4",
     "openai",
     "openai-whisper",
+    "pandas>=2.3.1",
     "passlib[bcrypt]>=1.7.4",
     "psutil>=5.9.0",
     "pydantic[email]>=2.11.7",
