@@ -111,6 +111,17 @@ def test_isolation(request):
             # マーカーに引数がある場合はそのデータを使用
             setup_orders_testdata()
 
+    elif "test_recommend" in test_file and test_name != "test_recommend_no_order_data":
+        # おすすめメニューテストの場合、カテゴリ、メニュー、注文データが必要
+        print(f"{test_name} - おすすめメニューテスト用データをSQLファイルで準備中")
+        cleanup_all_testdata()
+        setup_categories_testdata()
+        setup_menus_testdata()
+
+        if marker and marker.args:
+            # マーカーに引数がある場合はそのデータを使用
+            setup_orders_testdata()
+
     elif "test_category" in test_file:
         
         # カテゴリテストの場合、カテゴリデータが必要
@@ -133,6 +144,12 @@ def test_isolation(request):
     if "test_get_orders_error" in test_name:
         # 注文がない状態でのテスト用（何もしない）
         pass
+    elif "test_recommend_no_order_data" in test_name:
+        # 注文データなしでのおすすめメニューテスト用（注文データをセットアップしない）
+        cleanup_all_testdata()
+        setup_categories_testdata()
+        setup_menus_testdata()
+        # 注文データはセットアップしない
     
     yield
         

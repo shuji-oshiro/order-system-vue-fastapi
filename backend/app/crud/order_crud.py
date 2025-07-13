@@ -12,6 +12,18 @@ def get_orders(db: Session, seat_id: int):
     return db.query(model.Order).filter(model.Order.seat_id == seat_id)
 
 
+# 特定メニューIDが注文された座席IDリストを取得
+def get_seats_by_menu_id(db: Session, menu_id: int):
+    """特定のメニューIDが注文された座席IDのリストを取得する"""
+    return db.query(model.Order.seat_id).filter(model.Order.menu_id == menu_id).distinct().all()
+
+
+# 特定の座席IDリストで注文されたメニューIDリストを取得
+def get_menu_ids_by_seats(db: Session, seat_ids: list[int]):
+    """特定の座席IDリストで注文されたメニューIDのリストを取得する"""
+    return db.query(model.Order.menu_id).filter(model.Order.seat_id.in_(seat_ids)).distinct().all()
+
+
 # 注文情報の追加
 # 注文情報を追加する際は、座席ID、メニューID、注文数を指定して追加する
 def add_order(db: Session, orders: list[OrderIn]):
