@@ -8,7 +8,7 @@ client = TestClient(app)
 
 @pytest.mark.db_setup("recommend_orders")
 def test_recommend_phase1_frequency():
-    """Phase 1: 頻度ベースレコメンドのテスト"""
+    """Phase 1: 頻度ベースレコメンドのテスト（カテゴリ構造含む）"""
     # メニューID=11（焼肉定食）に基づくおすすめメニューを取得
     # テストデータでは焼肉定食(11)とビール(21)が最も高頻度で共起
     response = client.get("/recommend/11?phase=1")
@@ -27,6 +27,13 @@ def test_recommend_phase1_frequency():
     # 頻度ベースでビール(21)が推薦されることを期待
     assert data["id"] == 21
     assert "ビール" in data["name"]
+    
+    # カテゴリ情報の構造確認も統合
+    category = data["category"]
+    assert "name" in category
+    assert "description" in category
+    assert isinstance(category["name"], str)
+    assert isinstance(category["description"], (str, type(None)))  # descriptionはOptional
 
 
 @pytest.mark.db_setup("recommend_orders")
@@ -143,20 +150,6 @@ def test_recommend_fallback_mechanism():
 
 
 @pytest.mark.db_setup("recommend_orders")
-def test_recommend_frequency_validation():
-    """頻度ベースレコメンドの検証テスト"""
-    # 焼肉定食(11)に対する推薦が期待通りか詳細チェック
-    response = client.get("/recommend/11?phase=1")
-    assert response.status_code == 200
-    data = response.json()
-    
-    # テストデータに基づいて、ビール(21)が最も頻度が高いはず
-    assert data["id"] == 21
-    assert data["price"] == 400  # ビールの価格
-    assert "ビール" in data["name"]
-
-
-@pytest.mark.db_setup("recommend_orders")
 def test_recommend_category_structure():
     """カテゴリ情報が正しく含まれているかのテスト"""
     response = client.get("/recommend/11?phase=1")
@@ -224,10 +217,7 @@ def test_recommend_default_phase():
     assert response.status_code == 200
     data = response.json()
     
-    # Phase 1の結果と同じになることを確認
-    phase1_response = client.get("/recommend/11?phase=1")
-    phase1_data = phase1_response.json()
-    
-    assert data["id"] == phase1_data["id"]
-    assert data["name"] == phase1_data["name"]
+    # デフォルトでPhase 1と同じ結果（ビール）が返されることを確認
+    assert data["id"] == 21
+    assert "ビール" in data["name"]
 
