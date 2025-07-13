@@ -39,22 +39,71 @@ class Phase2TimeAndCategoryStrategy(RecommendStrategy):
     def recommend(self, menu_id: int, db: Session) -> int:
         from datetime import datetime
         
-        # まず頻度ベースを試行
+        # 基準メニューの情報を取得
+        base_menu = db.query(Menu).filter(Menu.id == menu_id).first()
+        if not base_menu:
+            raise ValueError("基準メニューが見つかりません")
+        
+        candidate_scores = {}
+        
+        # 1. 頻度ベーススコア（重み: 50%）
         try:
-            phase1 = Phase1FrequencyStrategy()
-            return phase1.recommend(menu_id, db)
-        except ValueError:
+            cooccurrence_results = order_crud.get_menu_cooccurrence_frequency(db, menu_id)
+            max_freq = max([result[1] for result in cooccurrence_results]) if cooccurrence_results else 1
+            
+            for candidate_menu_id, frequency in cooccurrence_results:
+                # 基準メニュー自身は除外
+                if candidate_menu_id != menu_id:
+                    if candidate_menu_id not in candidate_scores:
+                        candidate_scores[candidate_menu_id] = 0
+                    candidate_scores[candidate_menu_id] += (frequency / max_freq) * 0.5
+        except:
             pass
         
-        # 現在時刻での人気メニューを取得
-        current_hour = datetime.now().hour
-        popular_menus = order_crud.get_popular_menus_by_time_period(db, current_hour)
+        # 2. 時間帯スコア（重み: 30%）
+        try:
+            current_hour = datetime.now().hour
+            popular_menus = order_crud.get_popular_menus_by_time_period(db, current_hour)
+            max_time_freq = max([result[1] for result in popular_menus]) if popular_menus else 1
+            
+            for candidate_menu_id, frequency in popular_menus:
+                # 基準メニュー自身は除外
+                if candidate_menu_id != menu_id:
+                    if candidate_menu_id not in candidate_scores:
+                        candidate_scores[candidate_menu_id] = 0
+                    candidate_scores[candidate_menu_id] += (frequency / max_time_freq) * 0.3
+        except:
+            pass
         
-        if popular_menus:
-            return popular_menus[0][0]
+        # 3. カテゴリ親和性スコア（重み: 20%）
+        try:
+            category_affinity = order_crud.get_category_cooccurrence(db, base_menu.category_id)
+            max_category_freq = max([result[1] for result in category_affinity]) if category_affinity else 1
+            
+            # 親和性の高いカテゴリのメニューにスコアを追加
+            for category_id, frequency in category_affinity:
+                # 該当カテゴリのメニューを取得（基準メニューは除外）
+                category_menus = db.query(Menu.id).filter(
+                    Menu.category_id == category_id,
+                    Menu.id != menu_id
+                ).all()
+                category_score = (frequency / max_category_freq) * 0.2
+                
+                for (menu_id_in_category,) in category_menus:
+                    if menu_id_in_category not in candidate_scores:
+                        candidate_scores[menu_id_in_category] = 0
+                    candidate_scores[menu_id_in_category] += category_score
+        except:
+            pass
         
-        # カテゴリ親和性も試行（実装は後で詳細化）
-        raise ValueError("推薦できるメニューが見つかりません")
+        if not candidate_scores:
+            # フォールバック: Phase1を実行
+            phase1 = Phase1FrequencyStrategy()
+            return phase1.recommend(menu_id, db)
+        
+        # 最高スコアのメニューを返す
+        best_menu_id = max(candidate_scores.items(), key=lambda x: x[1])[0]
+        return best_menu_id
 
 
 class Phase3PriceConsiderationStrategy(RecommendStrategy):
@@ -77,7 +126,19 @@ class Phase3PriceConsiderationStrategy(RecommendStrategy):
         )
         
         if similar_price_menus:
-            # 頻度ベースで絞り込み
+            # Phase2のスコアリングシステムを使用して価格帯内で最適な選択
+            phase2_strategy = Phase2TimeAndCategoryStrategy()
+            try:
+                phase2_recommendation = phase2_strategy.recommend(menu_id, db)
+                
+                # Phase2の推薦が価格帯に含まれているかチェック
+                for menu in similar_price_menus:
+                    if menu.id == phase2_recommendation:
+                        return phase2_recommendation
+            except ValueError:
+                pass
+            
+            # Phase2で推薦されなかった場合、頻度ベースを試行
             try:
                 phase1 = Phase1FrequencyStrategy()
                 freq_recommendation = phase1.recommend(menu_id, db)
@@ -89,8 +150,26 @@ class Phase3PriceConsiderationStrategy(RecommendStrategy):
             except ValueError:
                 pass
             
-            # 価格帯メニューからランダム選択
-            return random.choice(similar_price_menus).id
+            # 最後の手段として、価格帯内で最も共起頻度の高いメニューを選択
+            candidate_scores = {}
+            try:
+                cooccurrence_results = order_crud.get_menu_cooccurrence_frequency(db, menu_id)
+                for candidate_menu_id, frequency in cooccurrence_results:
+                    # 価格帯内のメニューのみスコア付与
+                    for menu in similar_price_menus:
+                        if menu.id == candidate_menu_id:
+                            candidate_scores[candidate_menu_id] = frequency
+                            break
+                
+                if candidate_scores:
+                    return max(candidate_scores.items(), key=lambda x: x[1])[0]
+            except:
+                pass
+            
+            # 全て失敗した場合、価格差が最小のメニューを選択
+            closest_price_menu = min(similar_price_menus, 
+                                   key=lambda m: abs(m.price - base_menu.price))
+            return closest_price_menu.id
         
         # フォールバック: Phase2を実行
         phase2 = Phase2TimeAndCategoryStrategy()
@@ -112,9 +191,11 @@ class Phase4ComplexScoringStrategy(RecommendStrategy):
             max_freq = max([result[1] for result in cooccurrence_results]) if cooccurrence_results else 1
             
             for menu_id_candidate, frequency in cooccurrence_results:
-                if menu_id_candidate not in candidate_scores:
-                    candidate_scores[menu_id_candidate] = 0
-                candidate_scores[menu_id_candidate] += (frequency / max_freq) * 0.4
+                # 基準メニュー自身は除外
+                if menu_id_candidate != menu_id:
+                    if menu_id_candidate not in candidate_scores:
+                        candidate_scores[menu_id_candidate] = 0
+                    candidate_scores[menu_id_candidate] += (frequency / max_freq) * 0.4
         except:
             pass
         
@@ -125,16 +206,18 @@ class Phase4ComplexScoringStrategy(RecommendStrategy):
             max_time_freq = max([result[1] for result in popular_menus]) if popular_menus else 1
             
             for menu_id_candidate, frequency in popular_menus:
-                if menu_id_candidate not in candidate_scores:
-                    candidate_scores[menu_id_candidate] = 0
-                candidate_scores[menu_id_candidate] += (frequency / max_time_freq) * 0.2
+                # 基準メニュー自身は除外
+                if menu_id_candidate != menu_id:
+                    if menu_id_candidate not in candidate_scores:
+                        candidate_scores[menu_id_candidate] = 0
+                    candidate_scores[menu_id_candidate] += (frequency / max_time_freq) * 0.2
         except:
             pass
         
         # 3. 価格帯スコア（重み: 20%）
         try:
             base_menu = db.query(Menu).filter(Menu.id == menu_id).first()
-            if base_menu:
+            if base_menu and base_menu.price > 0:  # ゼロ除算回避
                 price_range = int(base_menu.price * 0.3)
                 min_price = max(0, base_menu.price - price_range)
                 max_price = base_menu.price + price_range
@@ -158,9 +241,11 @@ class Phase4ComplexScoringStrategy(RecommendStrategy):
             max_recent_freq = max([result[1] for result in recent_popular]) if recent_popular else 1
             
             for menu_id_candidate, frequency, _ in recent_popular:
-                if menu_id_candidate not in candidate_scores:
-                    candidate_scores[menu_id_candidate] = 0
-                candidate_scores[menu_id_candidate] += (frequency / max_recent_freq) * 0.2
+                # 基準メニュー自身は除外
+                if menu_id_candidate != menu_id:
+                    if menu_id_candidate not in candidate_scores:
+                        candidate_scores[menu_id_candidate] = 0
+                    candidate_scores[menu_id_candidate] += (frequency / max_recent_freq) * 0.2
         except:
             pass
         
