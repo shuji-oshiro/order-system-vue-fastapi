@@ -161,6 +161,14 @@ def get_recent_popular_menus(db: Session, days: int = 30, limit: int = 10):
     return result
 
 
+# ML学習用: 全注文データを取得
+def get_all_orders(db: Session):
+    """
+    全ての注文データを取得する（ML学習用）
+    """
+    return db.query(model.Order).all()
+
+
 # 注文情報の追加
 # 注文情報を追加する際は、座席ID、メニューID、注文数を指定して追加する
 def add_order(db: Session, orders: list[OrderIn]):

@@ -257,6 +257,9 @@ class Phase4ComplexScoringStrategy(RecommendStrategy):
         return best_menu_id
 
 
+from backend.app.service.phase5_ai_strategy import Phase5AIRecommendStrategy
+
+
 def recommend_menu_by_menu_id(menu_id: int, db: Session, phase: int = 1) -> MenuOut:
     """
     メニューIDに基づいておすすめメニューを取得する
@@ -264,7 +267,7 @@ def recommend_menu_by_menu_id(menu_id: int, db: Session, phase: int = 1) -> Menu
     Args:
         menu_id (int): 基準となるメニューID
         db (Session): データベースセッション
-        phase (int): 実装フェーズ（1-4）
+        phase (int): 実装フェーズ（1-5）
         
     Returns:
         MenuOut: おすすめメニュー
@@ -278,6 +281,7 @@ def recommend_menu_by_menu_id(menu_id: int, db: Session, phase: int = 1) -> Menu
         2: Phase2TimeAndCategoryStrategy(),
         3: Phase3PriceConsiderationStrategy(),
         4: Phase4ComplexScoringStrategy(),
+        5: Phase5AIRecommendStrategy(),
     }
     
     if phase not in strategies:

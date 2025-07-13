@@ -9,7 +9,7 @@ router = APIRouter()
 @router.get("/{menu_id}", response_model=MenuOut)
 def recommend(
     menu_id: int, 
-    phase: int = Query(default=1, ge=1, le=4, description="レコメンドフェーズ（1-4）"),
+    phase: int = Query(default=1, ge=1, le=5, description="レコメンドフェーズ（1-5）"),
     db: Session = Depends(get_db)
 ):
     """
@@ -17,7 +17,7 @@ def recommend(
     
     Args:
         menu_id (int): メニューID
-        phase (int): レコメンドフェーズ（1: 頻度ベース, 2: 時間帯+カテゴリ, 3: 価格考慮, 4: 複合スコア）
+        phase (int): レコメンドフェーズ（1: 頻度ベース, 2: 時間帯+カテゴリ, 3: 価格考慮, 4: 複合スコア, 5: AI学習）
         db (Session): データベースセッション
         
     Returns:

@@ -47,14 +47,17 @@ python backend/scripts/insert_test_data.py　# 初期起動時はスクリプト
 
 詳細な設計思想と各フェーズの考え方については、**[レコメンドシステム設計書](./RECOMMEND_SYSTEM.md)** をご参照ください。
 
+AI学習アルゴリズムの詳細設計については、**[AI学習アルゴリズム設計書](./AI_RECOMMEND_DESIGN.md)** をご参照ください。
+
 ### 概要
 
-4段階のフェーズで段階的に高度化されたアルゴリズムを提供：
+5段階のフェーズで段階的に高度化されたアルゴリズムを提供：
 
 - **Phase 1**: 頻度ベースレコメンド（基本）
 - **Phase 2**: 時間帯・カテゴリ親和性レコメンド（中級）
 - **Phase 3**: 価格帯考慮レコメンド（上級）
 - **Phase 4**: 複合スコアリングシステム（最上級）
+- **Phase 5**: AI学習アルゴリズム（Neural Collaborative Filtering）
 
 ### API使用方法
 
@@ -67,6 +70,12 @@ GET /recommend/{menu_id}?phase=2
 
 # Phase 3: 価格帯考慮推薦
 GET /recommend/{menu_id}?phase=3
+
+# Phase 4: 複合スコアリング推薦
+GET /recommend/{menu_id}?phase=4
+
+# Phase 5: AI学習アルゴリズム推薦
+GET /recommend/{menu_id}?phase=5
 
 # Phase 4: 複合スコアリング推薦
 GET /recommend/{menu_id}?phase=4
