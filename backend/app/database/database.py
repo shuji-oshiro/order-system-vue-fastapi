@@ -2,15 +2,20 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from backend.app.utils.utils import is_running_under_pytest
+from dotenv import load_dotenv
 
+# 環境変数の読み込み
+load_dotenv()
 
+# 通常の実行時は、ファイルベースのSQLiteデータベースを使用
 # SQLiteを使用する場合は、ファイルパスを指定します。
+database_path = os.getenv("DATABASE_URL", "sqlite:///./backend/data/store_database.db")
+
 # backend/dataフォルダが存在しない場合は作成
 data_dir = "./backend/data"
 if not os.path.exists(data_dir):
     os.makedirs(data_dir, exist_ok=True)
 
-DATABASE_URL = "sqlite:///./backend/data/store_database.db"  # ← ファイルで保存
 if is_running_under_pytest():
 
     # pytest実行中の場合は、メモリ内データベースを使用
@@ -20,15 +25,16 @@ if is_running_under_pytest():
         file_path = os.path.join(script_dir, "../../data/.file")
         if os.path.exists(file_path):
             os.remove(file_path)  
-        DATABASE_URL = 'sqlite:///./backend/data/.file:mem1?mode=memory&cache=shared -uri True'
+        database_path = 'sqlite:///./backend/data/.file:mem1?mode=memory&cache=shared -uri True'
     except Exception as e:
         print(f"Error removing file: {e}")  # ファイル削除エラー
         raise e
-    
+
+
 # SQLAlchemy が DBと通信するためのエンジンを作成
 engine = create_engine(
     # check_same_thread=False：SQLiteでは複数スレッドから接続するために必要な設定（FastAPIは非同期なので必須）
-    DATABASE_URL,
+    database_path,
     connect_args={"check_same_thread": False}
     
 )
