@@ -41,7 +41,7 @@ python backend/scripts/insert_test_data.py　# 初期起動時はスクリプト
 
 ```
 
-## レコメンド機能
+## レコメンド機能（検証中）
 
 本アプリケーションは、過去の注文履歴データを分析して最適なメニューを推薦する高度なレコメンド機能を搭載しています。
 
@@ -77,11 +77,6 @@ GET /recommend/{menu_id}?phase=4
 # Phase 5: AI学習アルゴリズム推薦
 GET /recommend/{menu_id}?phase=5
 
-# Phase 4: 複合スコアリング推薦
-GET /recommend/{menu_id}?phase=4
-
-# デフォルト（Phase 1）
-GET /recommend/{menu_id}
 ```
 
 ## 開発ステータス
