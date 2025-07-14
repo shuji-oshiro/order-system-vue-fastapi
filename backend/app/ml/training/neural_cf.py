@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import logging
 
-from .base_model import PyTorchBaseModel
+from backend.app.ml.models.py_torch_base_model import PyTorchBaseModel
 from backend.app.crud import order_crud
 from backend.app.models.model import Menu
 

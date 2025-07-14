@@ -2,13 +2,13 @@
 .DS_Store
 .idea/
 .vscode/              # 自動テスト実行用に管理。必要に応じてコメントアウト調整
+.env
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 *.log
-.env
 
 # 依存ファイル・ビルド成果物
 node_modules/
@@ -34,6 +34,9 @@ temp.webm
 
 # データファイル（プロジェクト固有）
 data/
+
+# PyTorchモデルファイル
+*.pth 
 
 # typed-router 自動生成型定義
 frontend/src/typed-router.d.ts

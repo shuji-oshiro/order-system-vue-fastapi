@@ -8,7 +8,7 @@ import logging
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 from backend.app.models.model import Menu
-from backend.app.ml.models.neural_cf import NeuralCollaborativeFiltering
+from backend.app.ml.training.neural_cf import NeuralCollaborativeFiltering
 from backend.app.service.recommendtypes.recommend_strategy import RecommendStrategy
 
 class Phase5AIRecommendStrategy(RecommendStrategy):
