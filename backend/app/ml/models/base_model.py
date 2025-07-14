@@ -16,7 +16,7 @@ class BaseRecommendModel(ABC):
         self.is_trained = False
         
     @abstractmethod
-    def train(self, db: Session, **kwargs) -> Dict[str, Any]:
+    def fit(self, db: Session, **kwargs) -> Dict[str, Any]:
         """
         モデルを学習する
         

@@ -4,12 +4,12 @@ Phase5: AI学習アルゴリズム戦略クラス
 Neural Collaborative Filteringを使用した高度なレコメンド戦略
 """
 import os
+import logging
 from typing import Dict, Any
 from sqlalchemy.orm import Session
-from ..service.recommend_menu import RecommendStrategy
-from ..ml.models.neural_cf import NeuralCollaborativeFiltering
-from ..models.model import Menu
-import logging
+from backend.app.models.model import Menu
+from backend.app.service.recommendtypes.recommend_strategy import RecommendStrategy
+from backend.app.ml.models.neural_cf import NeuralCollaborativeFiltering
 
 
 class Phase5AIRecommendStrategy(RecommendStrategy):
@@ -45,13 +45,14 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
         num_users = max_seat_id + 1  # 0-indexedを考慮
         num_items = len(all_menus)
         
-        # モデル初期化
+        # モデル初期化（キャッシュ機能付き）
         self.model = NeuralCollaborativeFiltering(
             num_users=num_users,
             num_items=num_items,
             embedding_dim=64,
             hidden_dims=[128, 64, 32],
-            dropout_rate=0.3
+            dropout_rate=0.3,
+            db=db  # 初期化時にデータをキャッシュ
         )
         
         # 既存の学習済みモデルがあるか確認
@@ -64,17 +65,40 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
                 logging.warning(f"モデル読み込みに失敗: {e}")
                 logging.info("新規学習を開始します")
         
-        # 新規学習
+        # 新規学習（キャッシュ使用で高速化）
         logging.info("Neural Collaborative Filteringモデルの学習を開始...")
         
-        train_results = self.model.train(
-            db=db,
-            epochs=50,
-            batch_size=128,
-            learning_rate=0.001,
-            test_size=0.2
-        )
-        
+        try:
+            # キャッシュの状態をチェックして、dbを渡すかどうかを決定
+            needs_db = (not hasattr(self.model, '_cached_orders') or 
+                       self.model._cached_orders is None or 
+                       not self.model._is_cache_valid())
+            
+            if needs_db:
+                # キャッシュが無効な場合はdbを渡す
+                logging.info("キャッシュが無効なため、DBセッションを渡して学習を実行")
+                train_results = self.model.fit(
+                    db=db,
+                    epochs=50,
+                    batch_size=128,
+                    learning_rate=0.001,
+                    test_size=0.2,
+                    force_reload=False
+                )
+            else:
+                # キャッシュが有効な場合はdbを渡さない
+                logging.info("キャッシュが有効なため、キャッシュデータで学習を実行")
+                train_results = self.model.fit(
+                    epochs=50,
+                    batch_size=128,
+                    learning_rate=0.001,
+                    test_size=0.2,
+                    force_reload=False
+                )
+        except Exception as e:
+            logging.error(f"モデル学習中にエラーが発生: {e}")
+            raise ValueError("モデルの学習に失敗しました。データを確認してください。")
+            
         # モデル保存
         self.model.save_model(self.model_path)
         logging.info(f"学習完了。モデルを保存: {self.model_path}")
@@ -95,6 +119,7 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
             推薦するメニューID
         """
         try:
+            # 
             # モデルを読み込みまたは学習
             model = self._load_or_train_model(db)
             
@@ -144,7 +169,7 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
         except Exception as e:
             logging.error(f"AI推薦でエラーが発生: {e}")
             # フォールバック: Phase4にフォールバック
-            from ..service.recommend_menu import Phase4ComplexScoringStrategy
+            from ..recommend_menu import Phase4ComplexScoringStrategy
             fallback_strategy = Phase4ComplexScoringStrategy()
             return fallback_strategy.recommend(menu_id, db)
     
@@ -155,6 +180,7 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
         Args:
             db: データベースセッション
             **kwargs: 学習パラメータ
+                - force_reload: 強制的にデータを再読み込み（デフォルト: True）
             
         Returns:
             学習結果
@@ -163,15 +189,32 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
         if os.path.exists(self.model_path):
             os.remove(self.model_path)
         
+        # キャッシュもクリア
+        if self.model:
+            self.model.clear_cache()
+        
         self.model = None
+        
+        # 強制データ再読み込みで新規学習
+        force_reload = kwargs.get('force_reload', True)
         
         # 新規学習
         model = self._load_or_train_model(db)
         
+        # 強制再読み込みが指定されている場合は追加学習
+        if force_reload and model:
+            logging.info("強制データ再読み込みで追加学習を実行...")
+            additional_results = model.fit(
+                db=db,
+                force_reload=True,
+                **kwargs
+            )
+            
         return {
             "status": "success",
             "message": "モデルの再学習が完了しました",
-            "model_path": self.model_path
+            "model_path": self.model_path,
+            "cache_cleared": True
         }
     
     def get_model_info(self) -> Dict[str, Any]:
