@@ -28,17 +28,15 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
     
     def __init__(
         self, 
-        num_users: int, 
-        num_items: int,
+        num_menus: int,  # num_usersからnum_menusに変更
         embedding_dim: int = 50,
         hidden_dims: List[int] = [128, 64, 32],
         dropout_rate: float = 0.2,
         db: Optional[Session] = None  # DBセッションを初期化時に受け取る
     ):
-        super().__init__("NeuralCollaborativeFiltering")
+        super().__init__("MenuRelationshipNetwork")  # 名前変更
         
-        self.num_users = num_users
-        self.num_items = num_items
+        self.num_menus = num_menus  # num_usersとnum_itemsを統合
         self.embedding_dim = embedding_dim
         self.hidden_dims = hidden_dims
         self.dropout_rate = dropout_rate
@@ -48,13 +46,20 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         self._data_cache_timestamp = None
         self._prepared_data_cache = None
         
-        # User and Item Embeddings
-        self.user_embedding = nn.Embedding(num_users, embedding_dim)
-        self.item_embedding = nn.Embedding(num_items, embedding_dim)
+        # Menu Embeddings（2つのメニューをエンベッド）
+        self.menu1_embedding = nn.Embedding(num_menus, embedding_dim)
+        self.menu2_embedding = nn.Embedding(num_menus, embedding_dim)
         
-        # Neural MF layers
+        # 特徴量エンコーダー（頻度・時間・カテゴリ類似度用）
+        self.feature_encoder = nn.Sequential(
+            nn.Linear(3, 16),  # 3つの特徴量（freq, time, category similarity）
+            nn.ReLU(),
+            nn.Dropout(dropout_rate * 0.5)
+        )
+        
+        # メインネットワーク（メニューエンベッディング + 特徴量）
         layers = []
-        input_dim = embedding_dim * 2  # user + item embeddings concatenated
+        input_dim = embedding_dim * 2 + 16  # menu1_emb + menu2_emb + feature_encoded
         
         for hidden_dim in hidden_dims:
             layers.extend([
@@ -64,22 +69,20 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
             ])
             input_dim = hidden_dim
             
-        # Output layer
+        # Output layer（メニュー関連度スコア）
         layers.append(nn.Linear(input_dim, 1))
         layers.append(nn.Sigmoid())
         
-        self.mlp = nn.Sequential(*layers)
+        self.main_network = nn.Sequential(*layers)
         
         # Initialize embeddings
         self._init_weights()
         
-        
         # Move to device
         self.to(self.device)
         
-        # Label encoders for user and item IDs
-        self.user_encoder = LabelEncoder()
-        self.item_encoder = LabelEncoder()
+        # Label encoder for menu IDs
+        self.menu_encoder = LabelEncoder()
         
         # 初期化時にデータを読み込む（オプショナル）
         if db is not None:
@@ -87,51 +90,62 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         
     def _init_weights(self):
         """重みの初期化 - Xavier/He初期化を適用"""
-        # Embeddings: 正規分布での初期化
-        nn.init.normal_(self.user_embedding.weight, std=0.01)
-        nn.init.normal_(self.item_embedding.weight, std=0.01)
+        # Menu Embeddings: 正規分布での初期化
+        nn.init.normal_(self.menu1_embedding.weight, std=0.01)
+        nn.init.normal_(self.menu2_embedding.weight, std=0.01)
         
-        # MLPの重み初期化
-        for module in self.mlp:
+        # Feature Encoder の重み初期化
+        for module in self.feature_encoder:
             if isinstance(module, nn.Linear):
-                # Xavier uniform初期化
                 nn.init.xavier_uniform_(module.weight)
                 nn.init.zeros_(module.bias)
         
-    def forward(self, user_ids: torch.Tensor, item_ids: torch.Tensor) -> torch.Tensor:
+        # Main Network の重み初期化
+        for module in self.main_network:
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                nn.init.zeros_(module.bias)
+        
+    def forward(self, menu1_ids: torch.Tensor, menu2_ids: torch.Tensor, features: torch.Tensor) -> torch.Tensor:
         """
-        順伝播
+        順伝播: メニュー間の関連度を予測
         
         Args:
-            user_ids: ユーザーIDのテンソル
-            item_ids: アイテムIDのテンソル
+            menu1_ids: 基準メニューIDのテンソル
+            menu2_ids: 対象メニューIDのテンソル
+            features: 特徴量テンソル (freq_similarity, time_similarity, category_similarity)
             
         Returns:
-            推薦スコア（0-1）
+            メニュー間関連度スコア（0-1）
         """
-        user_emb = self.user_embedding(user_ids)
-        item_emb = self.item_embedding(item_ids)
+        # メニューエンベッディング
+        menu1_emb = self.menu1_embedding(menu1_ids)
+        menu2_emb = self.menu2_embedding(menu2_ids)
         
-        # Concatenate embeddings
-        concat_emb = torch.cat([user_emb, item_emb], dim=1)
+        # 特徴量エンコード
+        feature_encoded = self.feature_encoder(features)
         
-        # Pass through MLP
-        output = self.mlp(concat_emb)
+        # 全てを結合
+        combined = torch.cat([menu1_emb, menu2_emb, feature_encoded], dim=1)
+        
+        # メインネットワーク通過
+        output = self.main_network(combined)
         
         return output.squeeze()
     
-    def prepare_data(self, db: Optional[Session] = None, force_reload: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def prepare_data(self, db: Optional[Session] = None, force_reload: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        データベースから学習データを準備（キャッシュ機能付き）
+        メニュー間の関連性学習用データを準備（キャッシュ機能付き）
         
         Args:
             db: データベースセッション（Noneの場合はキャッシュを使用）
             force_reload: 強制的にデータを再読み込みするかどうか
             
         Returns:
-            user_ids, item_ids, ratings (implicit feedback: 1 for interaction, 0 for no interaction)
+            menu1_ids, menu2_ids, frequencies, time_features, category_features
+            (基準メニュー, 関連メニュー, 共起頻度, 時間帯特徴量, カテゴリ特徴量)
         """
-        logging.info("データの準備を開始...")
+        logging.info("メニュー関連性データの準備を開始...")
         
         # ====================
         # キャッシュからのデータ取得戦略
@@ -162,77 +176,135 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         
         if not orders:
             raise ValueError("注文データが見つかりません")
-        
+
+        # メニュー情報を取得（カテゴリ情報含む）
+        if db is not None:
+            from backend.app.models.model import Menu
+            all_menus = db.query(Menu).all()
+            menu_categories = {menu.menu_id: menu.category_id for menu in all_menus}
+        else:
+            # キャッシュからメニュー情報を復元（簡易版）
+            menu_categories = {}
+            for order in orders:
+                if hasattr(order, 'menu') and order.menu:
+                    menu_categories[order.menu_id] = order.menu.category_id
+
         # DataFrameに変換
         order_data = []
         for order in orders:
             order_data.append({
                 'seat_id': order.seat_id,
-                'menu_id': order.menu_id, 
-                'quantity': order.order_cnt, # 注文数
-                'order_datetime': order.order_date # 注文日時
+                'menu_id': order.menu_id,
+                'quantity': order.order_cnt,
+                'order_datetime': order.order_date,
+                'hour': order.order_date.hour if order.order_date else 12,  # デフォルト12時
+                'category_id': menu_categories.get(order.menu_id, 0)  # デフォルトカテゴリ0
             })
         
         df = pd.DataFrame(order_data)
         
-        # 座席ID（ユーザー）とメニューID（アイテム）のエンコーディング
-        unique_users = df['seat_id'].unique()
-        unique_items = df['menu_id'].unique()
+        # 座席IDごとに注文されたメニューをグループ化
+        seat_menus = df.groupby('seat_id')['menu_id'].apply(list).to_dict()
         
-        self.user_encoder.fit(unique_users)
-        self.item_encoder.fit(unique_items)
+        # メニュー間の共起関係を構築
+        menu_pairs = []
         
-        # Positive interactions (実際の注文)
-        df['user_encoded'] = self.user_encoder.transform(df['seat_id'])
-        df['item_encoded'] = self.item_encoder.transform(df['menu_id'])
-        
-        # Implicit feedback: 注文されたら1
-        positive_interactions = df[['user_encoded', 'item_encoded']].drop_duplicates()
-        positive_interactions['rating'] = 1
-        
-        # Negative sampling: より効率的な実装
-        import random
-        
-        all_users = set(positive_interactions['user_encoded'].unique())
-        all_items = set(positive_interactions['item_encoded'].unique())
-        
-        negative_interactions = []
-        positive_set = set(zip(positive_interactions['user_encoded'], positive_interactions['item_encoded']))
-        
-        # ネガティブサンプリング（ポジティブサンプルの2倍）
-        neg_samples_needed = len(positive_interactions) * 2
-        users_list = list(all_users)
-        items_list = list(all_items)
-        
-        # ランダムサンプリングで効率化
-        attempts = 0
-        max_attempts = neg_samples_needed * 5  # 無限ループ回避
-        
-        while len(negative_interactions) < neg_samples_needed and attempts < max_attempts:
-            user = random.choice(users_list)
-            item = random.choice(items_list)
+        for seat_id, menu_list in seat_menus.items():
+            unique_menus = list(set(menu_list))  # 重複除去
             
-            if (user, item) not in positive_set:
-                negative_interactions.append({
-                    'user_encoded': user, 
-                    'item_encoded': item, 
-                    'rating': 0
-                })
+            # 同一座席で注文されたメニューのペアを作成
+            for i, menu1 in enumerate(unique_menus):
+                for j, menu2 in enumerate(unique_menus):
+                    if i != j:  # 異なるメニュー同士
+                        # メニュー1の特徴量
+                        menu1_orders = df[(df['seat_id'] == seat_id) & (df['menu_id'] == menu1)]
+                        menu1_freq = len(menu1_orders)
+                        menu1_avg_hour = menu1_orders['hour'].mean()
+                        menu1_category = menu1_orders['category_id'].iloc[0]
+                        
+                        # メニュー2の特徴量
+                        menu2_orders = df[(df['seat_id'] == seat_id) & (df['menu_id'] == menu2)]
+                        menu2_freq = len(menu2_orders)
+                        menu2_avg_hour = menu2_orders['hour'].mean()
+                        menu2_category = menu2_orders['category_id'].iloc[0]
+                        
+                        menu_pairs.append({
+                            'menu1_id': menu1,
+                            'menu2_id': menu2,
+                            'co_occurrence': 1,  # 共起フラグ
+                            'menu1_freq': menu1_freq,
+                            'menu2_freq': menu2_freq,
+                            'freq_similarity': min(menu1_freq, menu2_freq) / max(menu1_freq, menu2_freq),
+                            'time_similarity': 1.0 - abs(menu1_avg_hour - menu2_avg_hour) / 24.0,
+                            'category_similarity': 1.0 if menu1_category == menu2_category else 0.0,
+                        })
+        
+        # ネガティブサンプル（共起しないメニューペア）を生成
+        all_menus = df['menu_id'].unique()
+        negative_pairs = []
+        
+        # ポジティブサンプルの2倍のネガティブサンプルを生成
+        positive_pairs_set = set((pair['menu1_id'], pair['menu2_id']) for pair in menu_pairs)
+        
+        import random
+        neg_samples_needed = len(menu_pairs) * 2
+        attempts = 0
+        max_attempts = neg_samples_needed * 5
+        
+        while len(negative_pairs) < neg_samples_needed and attempts < max_attempts:
+            menu1 = random.choice(all_menus)
+            menu2 = random.choice(all_menus)
+            
+            if menu1 != menu2 and (menu1, menu2) not in positive_pairs_set:
+                # ランダムペアの特徴量（平均値を使用）
+                menu1_data = df[df['menu_id'] == menu1]
+                menu2_data = df[df['menu_id'] == menu2]
+                
+                if len(menu1_data) > 0 and len(menu2_data) > 0:
+                    menu1_freq = len(menu1_data)
+                    menu2_freq = len(menu2_data)
+                    menu1_avg_hour = menu1_data['hour'].mean()
+                    menu2_avg_hour = menu2_data['hour'].mean()
+                    menu1_category = menu1_data['category_id'].iloc[0]
+                    menu2_category = menu2_data['category_id'].iloc[0]
+                    
+                    negative_pairs.append({
+                        'menu1_id': menu1,
+                        'menu2_id': menu2,
+                        'co_occurrence': 0,  # 非共起フラグ
+                        'menu1_freq': menu1_freq,
+                        'menu2_freq': menu2_freq,
+                        'freq_similarity': min(menu1_freq, menu2_freq) / max(menu1_freq, menu2_freq),
+                        'time_similarity': 1.0 - abs(menu1_avg_hour - menu2_avg_hour) / 24.0,
+                        'category_similarity': 1.0 if menu1_category == menu2_category else 0.0,
+                    })
             
             attempts += 1
         
-        negative_df = pd.DataFrame(negative_interactions)
+        # 全データを結合
+        all_pairs = menu_pairs + negative_pairs
+        pairs_df = pd.DataFrame(all_pairs)
         
-        # Combine positive and negative samples
-        final_data = pd.concat([positive_interactions, negative_df], ignore_index=True)
-        final_data = final_data.sample(frac=1).reset_index(drop=True)  # Shuffle
+        # メニューIDをエンコード
+        unique_menus = sorted(df['menu_id'].unique())
+        self.menu_encoder = LabelEncoder()
+        self.menu_encoder.fit(unique_menus)
         
-        logging.info(f"準備完了: ポジティブサンプル {len(positive_interactions)}件, ネガティブサンプル {len(negative_interactions)}件")
+        pairs_df['menu1_encoded'] = self.menu_encoder.transform(pairs_df['menu1_id'])
+        pairs_df['menu2_encoded'] = self.menu_encoder.transform(pairs_df['menu2_id'])
+        
+        # データをシャッフル
+        pairs_df = pairs_df.sample(frac=1).reset_index(drop=True)
+        
+        logging.info(f"メニューペア準備完了: ポジティブサンプル {len(menu_pairs)}件, ネガティブサンプル {len(negative_pairs)}件")
+        logging.info(f"総メニュー数: {len(unique_menus)}")
         
         return (
-            final_data['user_encoded'].values.astype(np.int64),
-            final_data['item_encoded'].values.astype(np.int64),
-            final_data['rating'].values.astype(np.float32)
+            pairs_df['menu1_encoded'].values.astype(np.int64),
+            pairs_df['menu2_encoded'].values.astype(np.int64),
+            pairs_df[['freq_similarity', 'time_similarity', 'category_similarity']].values.astype(np.float32),
+            pairs_df['co_occurrence'].values.astype(np.float32),
+            np.zeros_like(pairs_df['co_occurrence'].values.astype(np.float32))  # 予備用配列
         )
     
     def fit(self, db: Optional[Session] = None, **kwargs) -> Dict[str, Any]:
@@ -264,21 +336,22 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         # ====================
         # 2. データキャッシュからの学習データ準備（効率化）
         # ====================
-        # 注文履歴からユーザー（座席）-アイテム（メニュー）の相互作用データを生成
+        # 注文履歴からメニュー間の関連性データを生成
         # キャッシュ機能により初回以降は高速化
-        user_ids, item_ids, ratings = self.prepare_data(db, force_reload=force_reload)
+        menu1_ids, menu2_ids, features, targets, _ = self.prepare_data(db, force_reload=force_reload)
         
         # ====================
         # 3. 訓練・テストデータの分割
         # ====================
         # 層化分割で0/1ラベルのバランスを保持しながらデータを分割
-        (user_train, user_test, 
-         item_train, item_test, 
-         rating_train, rating_test) = train_test_split(
-            user_ids, item_ids, ratings, 
+        (menu1_train, menu1_test, 
+         menu2_train, menu2_test, 
+         features_train, features_test,
+         targets_train, targets_test) = train_test_split(
+            menu1_ids, menu2_ids, features, targets,
             test_size=test_size,        # 20%をテストデータに
             random_state=42,            # 再現性のためのシード固定
-            stratify=ratings            # 0/1ラベルの比率を保持
+            stratify=targets            # 0/1ラベルの比率を保持
         )
         
         # ====================
@@ -286,15 +359,17 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         # ====================
         # NumPy配列からPyTorchテンソルに変換してDatasetを作成
         train_dataset = torch.utils.data.TensorDataset(
-            torch.LongTensor(user_train),    # ユーザーID（整数型）
-            torch.LongTensor(item_train),    # アイテムID（整数型）
-            torch.FloatTensor(rating_train)  # レーティング（0 or 1の浮動小数点型）
+            torch.LongTensor(menu1_train),     # 基準メニューID（整数型）
+            torch.LongTensor(menu2_train),     # 対象メニューID（整数型）
+            torch.FloatTensor(features_train), # 特徴量（freq, time, category similarity）
+            torch.FloatTensor(targets_train)   # ターゲット（0 or 1の浮動小数点型）
         )
         
         test_dataset = torch.utils.data.TensorDataset(
-            torch.LongTensor(user_test),
-            torch.LongTensor(item_test),
-            torch.FloatTensor(rating_test)
+            torch.LongTensor(menu1_test),
+            torch.LongTensor(menu2_test),
+            torch.FloatTensor(features_test),
+            torch.FloatTensor(targets_test)
         )
         
         # データローダー作成（効率的なバッチ処理のため）
@@ -354,7 +429,7 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
             batch_count = 0        # バッチカウンター（デバッグ用）
             
             # 訓練データの全バッチを処理
-            for user_batch, item_batch, rating_batch in train_loader:
+            for menu1_batch, menu2_batch, features_batch, targets_batch in train_loader:
                 batch_count += 1
                 
                 # 最初のエポックは詳細ログ、その後は間隔を空ける
@@ -363,25 +438,27 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
                 
                 # データの形状チェック（最初のバッチのみ）
                 if epoch == 0 and batch_count == 1:
-                    logging.info(f"  バッチサイズ: user={user_batch.shape}, item={item_batch.shape}, rating={rating_batch.shape}")
+                    logging.info(f"  バッチサイズ: menu1={menu1_batch.shape}, menu2={menu2_batch.shape}")
+                    logging.info(f"  特徴量={features_batch.shape}, ターゲット={targets_batch.shape}")
                 
                 # GPU/CPUにデータを移動
-                user_batch = self.to_device(user_batch)
-                item_batch = self.to_device(item_batch)
-                rating_batch = self.to_device(rating_batch)
+                menu1_batch = self.to_device(menu1_batch)
+                menu2_batch = self.to_device(menu2_batch)
+                features_batch = self.to_device(features_batch)
+                targets_batch = self.to_device(targets_batch)
                 
                 # 勾配をゼロクリア（前のバッチの勾配をリセット）
                 optimizer.zero_grad()
                 
                 # フォワードプロパゲーション（予測）
-                predictions = self.forward(user_batch, item_batch)
+                predictions = self.forward(menu1_batch, menu2_batch, features_batch)
                 # 損失計算（予測値と実際値の差）
-                loss = criterion(predictions, rating_batch)
+                loss = criterion(predictions, targets_batch)
                 
                 # デバッグ情報（最初のバッチのみ）
                 if batch_count == 1:
                     logging.info(f"最初のバッチ - 予測値範囲: [{predictions.min().item():.4f}, {predictions.max().item():.4f}]")
-                    logging.info(f"最初のバッチ - 実際値範囲: [{rating_batch.min().item():.4f}, {rating_batch.max().item():.4f}]")
+                    logging.info(f"最初のバッチ - 実際値範囲: [{targets_batch.min().item():.4f}, {targets_batch.max().item():.4f}]")
                     logging.info(f"最初のバッチ - 損失: {loss.item():.4f}")
                 
                 # バックプロパゲーション（勾配計算）
@@ -406,15 +483,16 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
             # 勾配計算を無効化してメモリ節約
             with torch.no_grad():
                 # テストデータの全バッチを処理
-                for user_batch, item_batch, rating_batch in test_loader:
+                for menu1_batch, menu2_batch, features_batch, targets_batch in test_loader:
                     # GPU/CPUにデータを移動
-                    user_batch = self.to_device(user_batch)
-                    item_batch = self.to_device(item_batch)
-                    rating_batch = self.to_device(rating_batch)
+                    menu1_batch = self.to_device(menu1_batch)
+                    menu2_batch = self.to_device(menu2_batch)
+                    features_batch = self.to_device(features_batch)
+                    targets_batch = self.to_device(targets_batch)
                     
                     # 予測と損失計算（勾配計算なし）
-                    predictions = self.forward(user_batch, item_batch)
-                    loss = criterion(predictions, rating_batch)
+                    predictions = self.forward(menu1_batch, menu2_batch, features_batch)
+                    loss = criterion(predictions, targets_batch)
                     
                     # テスト損失を累積
                     test_loss += loss.item()
@@ -507,22 +585,23 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         
         # 勾配計算を無効化してメモリ節約
         with torch.no_grad():
-            for user_batch, item_batch, rating_batch in test_loader:
+            for menu1_batch, menu2_batch, features_batch, targets_batch in test_loader:
                 # データをデバイスに移動
-                user_batch = self.to_device(user_batch)
-                item_batch = self.to_device(item_batch)
-                rating_batch = self.to_device(rating_batch)
+                menu1_batch = self.to_device(menu1_batch)
+                menu2_batch = self.to_device(menu2_batch)
+                features_batch = self.to_device(features_batch)
+                targets_batch = self.to_device(targets_batch)
                 
                 # 予測実行
-                predictions = self.forward(user_batch, item_batch)
+                predictions = self.forward(menu1_batch, menu2_batch, features_batch)
                 # 損失計算
-                loss = criterion(predictions, rating_batch)
+                loss = criterion(predictions, targets_batch)
                 total_loss += loss.item()
                 
                 # Binary accuracy計算（閾値0.5で二値分類）
                 binary_predictions = (predictions > 0.5).float()  # 0.5以上なら1、未満なら0
-                correct_predictions += (binary_predictions == rating_batch).sum().item()
-                total_predictions += rating_batch.size(0)
+                correct_predictions += (binary_predictions == targets_batch).sum().item()
+                total_predictions += targets_batch.size(0)
         
         # 精度計算（正解数 ÷ 総数）
         accuracy = correct_predictions / total_predictions if total_predictions > 0 else 0.0
@@ -532,54 +611,60 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
             'test_loss_final': total_loss / len(test_loader)  # 平均テスト損失
         }
     
-    def predict(self, user_id: int, menu_id: int, **kwargs) -> float:
+    def predict_menu_relationship(self, menu1_id: int, menu2_id: int, **kwargs) -> float:
         """
-        単一の予測を行う
+        2つのメニュー間の関連度を予測
         
         Args:
-            user_id: 座席ID
-            menu_id: メニューID
+            menu1_id: 基準メニューID
+            menu2_id: 対象メニューID
             **kwargs: 予測パラメータ（将来の拡張用）
             
         Returns:
-            推薦スコア (0-1)
+            メニュー間関連度スコア (0-1)
         """
         # 学習済み状態の確認
         if not self.is_trained:
-            raise ValueError("モデルが学習されていません。train()メソッドを先に実行してください。")
+            raise ValueError("モデルが学習されていません。fit()メソッドを先に実行してください。")
         
         # エンコーダーの学習状態確認
-        if not hasattr(self.user_encoder, 'classes_') or not hasattr(self.item_encoder, 'classes_'):
-            raise ValueError("エンコーダーが学習されていません。prepare_data()が正しく実行されていない可能性があります。")
+        if not hasattr(self.menu_encoder, 'classes_'):
+            raise ValueError("メニューエンコーダーが学習されていません。prepare_data()が正しく実行されていない可能性があります。")
         
         try:
-            # IDをエンコード（エラーハンドリング強化）
-            user_encoded_array = self.user_encoder.transform([user_id])
-            item_encoded_array = self.item_encoder.transform([menu_id])
-            user_encoded = int(user_encoded_array[0])  # type: ignore
-            item_encoded = int(item_encoded_array[0])  # type: ignore
+            # メニューIDをエンコード
+            menu1_encoded_array = self.menu_encoder.transform([menu1_id])
+            menu2_encoded_array = self.menu_encoder.transform([menu2_id])
+            
+            # numpy配列から値を取得
+            menu1_encoded = int(np.array(menu1_encoded_array)[0])
+            menu2_encoded = int(np.array(menu2_encoded_array)[0])
+            
+            # デフォルト特徴量（推論時は平均的な値を使用）
+            default_features = torch.FloatTensor([[0.5, 0.5, 0.5]])  # freq_sim, time_sim, category_sim
             
             # テンソルに変換
-            user_tensor = torch.LongTensor([user_encoded]).to(self.device)
-            item_tensor = torch.LongTensor([item_encoded]).to(self.device)
+            menu1_tensor = torch.LongTensor([menu1_encoded]).to(self.device)
+            menu2_tensor = torch.LongTensor([menu2_encoded]).to(self.device)
+            features_tensor = default_features.to(self.device)
             
             # 予測実行（評価モードで確実に実行）
             self.eval()  # 評価モードに設定（Dropout無効化）
             with torch.no_grad():
-                score = self.forward(user_tensor, item_tensor)
+                score = self.forward(menu1_tensor, menu2_tensor, features_tensor)
                 return float(score.cpu().numpy())
         
         except (ValueError, KeyError) as e:
             # 未知のIDの場合は詳細なログと平均スコアを返す
-            logging.warning(f"未知のID detected - user_id: {user_id}, menu_id: {menu_id}, error: {str(e)}")
+            logging.warning(f"未知のメニューID detected - menu1_id: {menu1_id}, menu2_id: {menu2_id}, error: {str(e)}")
             return 0.5
     
-    def recommend(self, user_id: int, exclude_menu_ids: Optional[List[int]] = None, top_k: int = 10) -> List[Tuple[int, float]]:
+    def recommend_similar_menus(self, base_menu_id: int, exclude_menu_ids: Optional[List[int]] = None, top_k: int = 10) -> List[Tuple[int, float]]:
         """
-        ユーザーに対する推薦を行う
+        基準メニューに類似したメニューを推薦
         
         Args:
-            user_id: 座席ID
+            base_menu_id: 基準となるメニューID
             exclude_menu_ids: 除外するメニューIDのリスト（デフォルト: None）
             top_k: 推薦する件数（デフォルト: 10）
             
@@ -588,25 +673,28 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         """
         # 学習済み状態の確認
         if not self.is_trained:
-            raise ValueError("モデルが学習されていません。train()メソッドを先に実行してください。")
+            raise ValueError("モデルが学習されていません。fit()メソッドを先に実行してください。")
         
         # エンコーダーの学習状態確認
-        if not hasattr(self.item_encoder, 'classes_'):
-            raise ValueError("アイテムエンコーダーが学習されていません。prepare_data()が正しく実行されていない可能性があります。")
+        if not hasattr(self.menu_encoder, 'classes_'):
+            raise ValueError("メニューエンコーダーが学習されていません。prepare_data()が正しく実行されていない可能性があります。")
         
         if exclude_menu_ids is None:
             exclude_menu_ids = []
         
+        # 基準メニューも除外リストに追加（自分自身は推薦しない）
+        exclude_menu_ids = list(exclude_menu_ids) + [base_menu_id]
+        
         # 全メニューに対するスコアを計算
-        all_items = self.item_encoder.classes_
+        all_menus = self.menu_encoder.classes_
         recommendations = []
         
-        logging.info(f"推薦計算開始 - user_id: {user_id}, 対象メニュー数: {len(all_items)}")
+        logging.info(f"メニュー推薦計算開始 - 基準メニュー: {base_menu_id}, 対象メニュー数: {len(all_menus)}")
         
-        for menu_id in all_items:
+        for menu_id in all_menus:
             if menu_id not in exclude_menu_ids:
                 try:
-                    score = self.predict(user_id, menu_id)
+                    score = self.predict_menu_relationship(base_menu_id, menu_id)
                     recommendations.append((int(menu_id), float(score)))
                 except Exception as e:
                     # 個別のメニューで予測エラーが発生した場合はスキップ
@@ -616,36 +704,66 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         # スコア降順でソート
         recommendations.sort(key=lambda x: x[1], reverse=True)
         
-        logging.info(f"推薦計算完了 - 推薦候補数: {len(recommendations)}, 返却数: {min(top_k, len(recommendations))}")
+        logging.info(f"メニュー推薦計算完了 - 推薦候補数: {len(recommendations)}, 返却数: {min(top_k, len(recommendations))}")
         
         return recommendations[:top_k]
     
+    def predict(self, user_id: int, menu_id: int, **kwargs) -> float:
+        """
+        後方互換性のための予測メソッド（非推奨）
+        新しいアーキテクチャでは predict_menu_relationship を使用
+        
+        Args:
+            user_id: 座席ID（非推奨パラメータ、メニューIDとして解釈）
+            menu_id: メニューID
+            **kwargs: 予測パラメータ
+            
+        Returns:
+            メニュー間関連度スコア (0-1)
+        """
+        # 警告メッセージ
+        logging.warning("predict()は非推奨です。predict_menu_relationship()を使用してください。")
+        
+        # user_idを基準メニューIDとして扱う
+        return self.predict_menu_relationship(user_id, menu_id, **kwargs)
+    
+    def recommend(self, user_id: int, exclude_menu_ids: Optional[List[int]] = None, top_k: int = 10) -> List[Tuple[int, float]]:
+        """
+        後方互換性のための推薦メソッド（非推奨）
+        新しいアーキテクチャでは recommend_similar_menus を使用
+        
+        Args:
+            user_id: 座席ID（非推奨パラメータ、基準メニューIDとして解釈）
+            exclude_menu_ids: 除外するメニューIDのリスト
+            top_k: 推薦する件数
+            
+        Returns:
+            (menu_id, score)のリスト（スコア降順）
+        """
+        # 警告メッセージ
+        logging.warning("recommend()は非推奨です。recommend_similar_menus()を使用してください。")
+        
+        # user_idを基準メニューIDとして扱う
+        return self.recommend_similar_menus(user_id, exclude_menu_ids, top_k)
+    
     def _validate_encoders(self) -> bool:
         """
-        エンコーダーの学習状態を検証
+        メニューエンコーダーの学習状態を検証
         
         Returns:
             bool: エンコーダーが正しく学習されている場合True
         """
         try:
-            # user_encoderの状態確認
-            if not hasattr(self.user_encoder, 'classes_'):
-                logging.error("user_encoderが学習されていません")
-                return False
-            
-            # item_encoderの状態確認    
-            if not hasattr(self.item_encoder, 'classes_'):
-                logging.error("item_encoderが学習されていません")
+            # menu_encoderの状態確認
+            if not hasattr(self.menu_encoder, 'classes_'):
+                logging.error("menu_encoderが学習されていません")
                 return False
             
             # クラス数とモデルの次元数の整合性確認
-            if len(self.user_encoder.classes_) > self.num_users:
-                logging.warning(f"user_encoder classes ({len(self.user_encoder.classes_)}) > num_users ({self.num_users})")
-                
-            if len(self.item_encoder.classes_) > self.num_items:
-                logging.warning(f"item_encoder classes ({len(self.item_encoder.classes_)}) > num_items ({self.num_items})")
+            if len(self.menu_encoder.classes_) > self.num_menus:
+                logging.warning(f"menu_encoder classes ({len(self.menu_encoder.classes_)}) > num_menus ({self.num_menus})")
             
-            logging.info(f"エンコーダー検証完了 - Users: {len(self.user_encoder.classes_)}, Items: {len(self.item_encoder.classes_)}")
+            logging.info(f"メニューエンコーダー検証完了 - メニュー数: {len(self.menu_encoder.classes_)}")
             return True
             
         except Exception as e:
@@ -666,22 +784,17 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
             'embedding_dim': self.embedding_dim,
             'hidden_dims': self.hidden_dims,
             'dropout_rate': self.dropout_rate,
-            'num_users': self.num_users,
-            'num_items': self.num_items
+            'num_menus': self.num_menus,
+            'architecture': 'MenuRelationshipNetwork'
         }
         
-        # エンコーダー情報
-        if hasattr(self.user_encoder, 'classes_'):
-            info['encoded_users'] = len(self.user_encoder.classes_)
-            info['user_ids_range'] = f"{self.user_encoder.classes_.min()}-{self.user_encoder.classes_.max()}"
+        # メニューエンコーダー情報
+        if hasattr(self.menu_encoder, 'classes_'):
+            info['encoded_menus'] = len(self.menu_encoder.classes_)
+            info['menu_ids_range'] = f"{self.menu_encoder.classes_.min()}-{self.menu_encoder.classes_.max()}"
         else:
-            info['encoded_users'] = 0
-            
-        if hasattr(self.item_encoder, 'classes_'):
-            info['encoded_items'] = len(self.item_encoder.classes_)
-            info['item_ids_range'] = f"{self.item_encoder.classes_.min()}-{self.item_encoder.classes_.max()}"
-        else:
-            info['encoded_items'] = 0
+            info['encoded_menus'] = 0
+            info['menu_ids_range'] = "未設定"
             
         return info
     

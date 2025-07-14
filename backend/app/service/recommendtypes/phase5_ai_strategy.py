@@ -31,24 +31,16 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
         if self.model is not None and self.model.is_trained:
             return self.model
         
-        # データベースから全メニューと座席の数を取得
+        # データベースから全メニューの数を取得
         all_menus = db.query(Menu).all()
+        num_menus = len(all_menus)
         
-        # 座席IDの最大値を取得（動的に設定）
-        from backend.app.crud import order_crud
-        all_orders = order_crud.get_all_orders(db)
-        
-        if not all_orders:
-            raise ValueError("注文データが見つかりません")
-        
-        max_seat_id = max([order.seat_id for order in all_orders])
-        num_users = max_seat_id + 1  # 0-indexedを考慮
-        num_items = len(all_menus)
+        if not all_menus:
+            raise ValueError("メニューデータが見つかりません")
         
         # モデル初期化（キャッシュ機能付き）
         self.model = NeuralCollaborativeFiltering(
-            num_users=num_users,
-            num_items=num_items,
+            num_menus=num_menus,
             embedding_dim=64,
             hidden_dims=[128, 64, 32],
             dropout_rate=0.3,
@@ -119,39 +111,12 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
             推薦するメニューID
         """
         try:
-            # 
             # モデルを読み込みまたは学習
             model = self._load_or_train_model(db)
             
-            # 基準メニューを注文した座席を特定
-            from backend.app.crud import order_crud
-            
-            # 最新の座席IDを取得（実際のアプリケーションでは現在の座席IDを使用）
-            from sqlalchemy import func
-            from backend.app.models.model import Order
-            
-            recent_order = db.query(
-                func.max(Order.seat_id)
-            ).scalar()
-            
-            if not recent_order:
-                # フォールバック: 全座席の中から最も頻繁に基準メニューを注文している座席を使用
-                seat_orders = order_crud.get_seats_by_menu_id(db, menu_id)
-                if not seat_orders:
-                    raise ValueError("基準メニューの注文履歴が見つかりません")
-                
-                # 最も多く注文している座席を使用
-                seat_counts = {}
-                for (seat_id,) in seat_orders:
-                    seat_counts[seat_id] = seat_counts.get(seat_id, 0) + 1
-                
-                user_id = max(seat_counts.items(), key=lambda x: x[1])[0]
-            else:
-                user_id = recent_order
-            
-            # AI推薦の実行
-            recommendations = model.recommend(
-                user_id=user_id,
+            # メニュー間関連性に基づく推薦の実行
+            recommendations = model.recommend_similar_menus(
+                base_menu_id=menu_id,
                 exclude_menu_ids=[menu_id],
                 top_k=5
             )
@@ -162,7 +127,7 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
             # 最高スコアのメニューを返す
             recommended_menu_id, score = recommendations[0]
             
-            logging.info(f"AI推薦完了: メニューID {recommended_menu_id} (スコア: {score:.4f})")
+            logging.info(f"AI推薦完了: メニューID {recommended_menu_id} (関連度スコア: {score:.4f})")
             
             return recommended_menu_id
             
