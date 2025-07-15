@@ -432,6 +432,31 @@ def get_menu_count(db: Session) -> int:
         )
 
 
+def get_all_menus(db: Session):
+    """
+    全メニュー情報を取得する（ML学習用）
+    
+    Args:
+        db (Session): データベースセッション
+        
+    Returns:
+        List[Menu]: 全メニュー情報のリスト
+        
+    Raises:
+        HTTPException: データベースエラー時
+    """
+    try:
+        menus = db.query(model.Menu)\
+                 .options(joinedload(model.Menu.category))\
+                 .all()
+        return menus
+    except SQLAlchemyError as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"全メニュー情報の取得中にエラーが発生しました: {str(e)}"
+        )
+
+
 # 従来のCSVインポート機能（互換性のため残す）
 def import_menus_from_csv(db: Session, menus: List[MenuIn]):
     """
@@ -466,4 +491,4 @@ def add_menu(db: Session, menu: MenuIn):
         HTTPException: バリデーションエラーまたはデータベースエラー時
     """
     create_menu(db, menu)
-    return get_menus(db) 
+    return get_menus(db)

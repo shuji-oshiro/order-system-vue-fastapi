@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
-from backend.app.ml.base.abstract_model import AbstractModel
+from backend.app.ml.base.abstract_model import BaseRecommendModel
 
-class PyTorchBaseModel(AbstractModel, nn.Module):
+class PyTorchBaseModel(BaseRecommendModel, nn.Module):
     """PyTorchベースのレコメンドモデル"""
     
     def __init__(self, model_name: str):
-        AbstractModel.__init__(self, model_name)
+        BaseRecommendModel.__init__(self, model_name)
         nn.Module.__init__(self)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         

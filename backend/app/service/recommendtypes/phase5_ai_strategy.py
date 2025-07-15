@@ -1,14 +1,17 @@
 """
 Phase5: AI学習アルゴリズム戦略クラス
 
-Neural Collaborative Filteringを使用した高度なレコメンド戦略
+Neural Collaborative Filteringを使用したレコメンド戦略
+学習済みモデルのみを使用（学習機能は分離済み）
 """
-import os
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Union
 from sqlalchemy.orm import Session
-from backend.app.models.model import Menu
+
+from backend.app.crud import menu_crud
 from backend.app.ml.models.neural_cf.model import NeuralCollaborativeFiltering
+from backend.app.ml.inference.model_loader import ModelLoader
+from backend.app.ml.utils.device_manager import DeviceManager
 from backend.app.service.recommendtypes.recommend_strategy import RecommendStrategy
 
 class Phase5AIRecommendStrategy(RecommendStrategy):
@@ -16,87 +19,52 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
     
     def __init__(self):
         self.model = None
-        self.model_path = "backend/app/ml/saved_models/neural_cf_model.pth"
-        self._ensure_model_directory()
+        self.model_loader = ModelLoader()
+        self.device_manager = DeviceManager()
+        self.model_name = "neural_cf"
         
-    def _ensure_model_directory(self):
-        """モデル保存ディレクトリを作成"""
-        os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
-    
-    def _load_or_train_model(self, db: Session) -> NeuralCollaborativeFiltering:
+    def _load_trained_model(self, db: Session) -> Optional[NeuralCollaborativeFiltering]:
         """
-        学習済みモデルを読み込むか、新規に学習する
+        学習済みモデルを読み込む（学習機能なし）
+        
+        Args:
+            db: データベースセッション
+            
+        Returns:
+            学習済みモデル（存在しない場合はNone）
         """
-        if self.model is not None and self.model.is_trained:
+        if self.model is not None:
             return self.model
         
-        # データベースから全メニューの数を取得
-        all_menus = db.query(Menu).all()
-        num_menus = len(all_menus)
-        
-        if not all_menus:
-            raise ValueError("メニューデータが見つかりません")
-        
-        # モデル初期化（キャッシュ機能付き）
-        self.model = NeuralCollaborativeFiltering(
-            num_menus=num_menus,
-            embedding_dim=64,
-            hidden_dims=[128, 64, 32],
-            dropout_rate=0.3,
-            db=db  # 初期化時にデータをキャッシュ
-        )
-        
-        # 既存の学習済みモデルがあるか確認
-        if os.path.exists(self.model_path):
-            try:
-                logging.info(f"学習済みモデルを読み込み: {self.model_path}")
-                self.model.load_model(self.model_path)
-                return self.model
-            except Exception as e:
-                logging.warning(f"モデル読み込みに失敗: {e}")
-                logging.info("新規学習を開始します")
-        
-        # 新規学習（キャッシュ使用で高速化）
-        logging.info("Neural Collaborative Filteringモデルの学習を開始...")
-        
         try:
-            # キャッシュの状態をチェックして、dbを渡すかどうかを決定
-            needs_db = (not hasattr(self.model, '_cached_orders') or 
-                       self.model._cached_orders is None or 
-                       not self.model._is_cache_valid())
+            # 学習済みモデルの存在確認
+            available_models = self.model_loader.get_available_models(self.model_name)
+            if "latest.pth" not in available_models:
+                logging.warning("学習済みモデルが見つかりません")
+                return None
             
-            if needs_db:
-                # キャッシュが無効な場合はdbを渡す
-                logging.info("キャッシュが無効なため、DBセッションを渡して学習を実行")
-                train_results = self.model.fit(
-                    db=db,
-                    epochs=50,
-                    batch_size=128,
-                    learning_rate=0.001,
-                    test_size=0.2,
-                    force_reload=False
-                )
+            # デバイスを取得
+            device = self.device_manager.get_device()
+            
+            # モデル初期化（動的初期化対応）
+            self.model = NeuralCollaborativeFiltering()
+            
+            # 学習済みモデルを読み込み
+            logging.info(f"学習済みモデルを読み込み: {self.model_name}/latest.pth")
+            loaded_model = self.model_loader.load_model(self.model, self.model_name, device=device)
+            
+            # 型エラー回避のため、明示的にキャスト
+            if isinstance(loaded_model, NeuralCollaborativeFiltering):
+                self.model = loaded_model
+                logging.info("学習済みモデルの読み込みが完了しました")
+                return self.model
             else:
-                # キャッシュが有効な場合はdbを渡さない
-                logging.info("キャッシュが有効なため、キャッシュデータで学習を実行")
-                train_results = self.model.fit(
-                    epochs=50,
-                    batch_size=128,
-                    learning_rate=0.001,
-                    test_size=0.2,
-                    force_reload=False
-                )
+                logging.error("モデルの型が不正です")
+                return None
+                
         except Exception as e:
-            logging.error(f"モデル学習中にエラーが発生: {e}")
-            raise ValueError("モデルの学習に失敗しました。データを確認してください。")
-            
-        # モデル保存
-        self.model.save_model(self.model_path)
-        logging.info(f"学習完了。モデルを保存: {self.model_path}")
-        logging.info(f"最終学習損失: {train_results['final_train_loss']:.4f}")
-        logging.info(f"最終検証損失: {train_results['final_test_loss']:.4f}")
-        
-        return self.model
+            logging.error(f"モデル読み込みに失敗: {e}")
+            return None
     
     def recommend(self, menu_id: int, db: Session) -> int:
         """
@@ -110,21 +78,31 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
             推薦するメニューID
         """
         try:
-            # モデルを読み込みまたは学習
-            model = self._load_or_train_model(db)
+            # 学習済みモデルを読み込み
+            model = self._load_trained_model(db)
+            
+            if model is None:
+                # 学習済みモデルが存在しない場合はフォールバック
+                logging.warning("学習済みモデルが存在しないため、Phase4にフォールバックします")
+                return self._fallback_recommend(menu_id, db)
             
             # メニュー間関連性に基づく推薦の実行
-            recommendations = model.recommend_similar_menus(
+            recommendations = model.recommend_menus(
                 base_menu_id=menu_id,
-                exclude_menu_ids=[menu_id],
-                top_k=5
+                top_k=5,
+                db=db,
+                exclude_menu_ids=[menu_id]
             )
             
             if not recommendations:
-                raise ValueError("AI推薦に失敗しました")
+                # 推薦結果が空の場合はフォールバック
+                logging.warning("AI推薦結果が空のため、Phase4にフォールバックします")
+                return self._fallback_recommend(menu_id, db)
             
             # 最高スコアのメニューを返す
-            recommended_menu_id, score = recommendations[0]
+            recommended_menu = recommendations[0]
+            recommended_menu_id = recommended_menu['menu_id']
+            score = recommended_menu['relationship_score']
             
             logging.info(f"AI推薦完了: メニューID {recommended_menu_id} (関連度スコア: {score:.4f})")
             
@@ -132,62 +110,62 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
             
         except Exception as e:
             logging.error(f"AI推薦でエラーが発生: {e}")
-            # フォールバック: Phase4にフォールバック
+            return self._fallback_recommend(menu_id, db)
+    
+    def _fallback_recommend(self, menu_id: int, db: Session) -> int:
+        """
+        フォールバック推薦（Phase4に委譲）
+        
+        Args:
+            menu_id: 基準となるメニューID
+            db: データベースセッション
+            
+        Returns:
+            推薦するメニューID
+        """
+        try:
             from ..recommend_menu import Phase4ComplexScoringStrategy
             fallback_strategy = Phase4ComplexScoringStrategy()
             return fallback_strategy.recommend(menu_id, db)
+        except Exception as e:
+            logging.error(f"フォールバック推薦でもエラーが発生: {e}")
+            # 最後の手段として、同じカテゴリの別のメニューを返す
+            return self._emergency_recommend(menu_id, db)
     
-    def retrain_model(self, db: Session, **kwargs) -> Dict[str, Any]:
+    def _emergency_recommend(self, menu_id: int, db: Session) -> int:
         """
-        モデルを再学習する
+        緊急時推薦（同じカテゴリの別のメニュー）
         
         Args:
+            menu_id: 基準となるメニューID
             db: データベースセッション
-            **kwargs: 学習パラメータ
-                - force_reload: 強制的にデータを再読み込み（デフォルト: True）
             
         Returns:
-            学習結果
+            推薦するメニューID
         """
-        # 既存モデルを削除
-        if os.path.exists(self.model_path):
-            os.remove(self.model_path)
-        
-        # キャッシュもクリア
-        if self.model:
-            self.model.clear_cache()
-        
-        self.model = None
-        
-        # 強制データ再読み込みで新規学習
-        force_reload = kwargs.get('force_reload', True)
-        
-        # 新規学習
-        model = self._load_or_train_model(db)
-        
-        # 強制再読み込みが指定されている場合は追加学習
-        if force_reload and model:
-            logging.info("強制データ再読み込みで追加学習を実行...")
-            additional_results = model.fit(
-                db=db,
-                force_reload=True,
-                **kwargs
-            )
+        try:
+            # 基準メニューを取得
+            base_menu = menu_crud.get_menu_by_id(db, menu_id)
+            if not base_menu:
+                # 基準メニューが見つからない場合は最初のメニューを返す
+                all_menus = menu_crud.get_all_menus(db)
+                return all_menus[0].id if all_menus else menu_id
             
-        return {
-            "status": "success",
-            "message": "モデルの再学習が完了しました",
-            "model_path": self.model_path,
-            "cache_cleared": True
-        }
-    
-    def get_model_info(self) -> Dict[str, Any]:
-        """
-        モデル情報を取得
-        """
-        return {
-            "model_name": "Neural Collaborative Filtering",
-            "model_path": self.model_path,
-            "is_trained": self.model.is_trained if self.model else False,
-            "model_exists": os.path.exists(self.model_path)
-        }
+            # 同じカテゴリの別のメニューを取得
+            same_category_menus = menu_crud.get_menus_by_category(db, base_menu.category_id)
+            
+            # 基準メニュー以外から選択
+            other_menus = [m for m in same_category_menus if m.id != menu_id]
+            
+            if other_menus:
+                recommended_id = other_menus[0].id
+                logging.info(f"緊急時推薦: 同じカテゴリのメニューID {recommended_id}")
+                return recommended_id
+            else:
+                # 同じカテゴリに他のメニューがない場合は基準メニューをそのまま返す
+                logging.warning("推薦できるメニューが見つからないため、基準メニューを返します")
+                return menu_id
+                
+        except Exception as e:
+            logging.error(f"緊急時推薦でもエラーが発生: {e}")
+            return menu_id
