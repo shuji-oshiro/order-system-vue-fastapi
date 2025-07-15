@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Tuple, Optional
 
 
-class BaseRecommendModel(ABC):
+class AbstractModel(ABC):
     """レコメンドモデルのベースクラス"""
     
     def __init__(self, model_name: str):

@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import logging
 
-from backend.app.ml.models.py_torch_base_model import PyTorchBaseModel
+from backend.app.ml.base.py_torch_base_model import PyTorchBaseModel
 from backend.app.crud import order_crud
 from backend.app.models.model import Menu
 
@@ -21,9 +21,9 @@ from backend.app.models.model import Menu
 class NeuralCollaborativeFiltering(PyTorchBaseModel):
     """
     Neural Collaborative Filtering モデル
-    
-    ユーザー（座席）とアイテム（メニュー）のEmbeddingを学習し、
-    非線形なニューラルネットワークで推薦スコアを予測
+    メニュー間の関連性を学習する
+    特徴量: 共起頻度、時間帯、カテゴリ類似度
+    PyTorchを使用して実装
     """
     
     def __init__(
