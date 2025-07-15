@@ -129,7 +129,7 @@ async def retrain_existing_model(
     request: TrainingRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> JSONResponse:
     """既存モデルを再学習（バックグラウンド処理）"""
     try:
         trainer = AIModelTrainer()
@@ -141,6 +141,8 @@ async def retrain_existing_model(
                 detail="既存モデルが見つかりません。新規学習を実行してください。"
             )
         
+        modelinfo = trainer.get_model_info()  # モデル情報を取得してログに出力
+
         # バックグラウンドで再学習開始
         def retrain_model():
             success = trainer.retrain_existing_model(
@@ -150,7 +152,8 @@ async def retrain_existing_model(
                 learning_rate=request.learning_rate,
                 test_size=request.test_size,
                 patience=request.patience,
-                force_reload=request.force_reload
+                force_reload=request.force_reload,
+                modelinfo=modelinfo
             )
             if success:
                 logging.info("バックグラウンド再学習が正常に完了しました")
@@ -158,13 +161,16 @@ async def retrain_existing_model(
                 logging.error("バックグラウンド再学習が失敗しました")
         
         background_tasks.add_task(retrain_model)
-        
-        return {
-            "status": "accepted",
-            "message": "既存モデルの再学習をバックグラウンドで開始しました",
-            "model_name": "neural_cf"
-        }
-        
+
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "accepted",
+                "message": "既存モデルの再学習をバックグラウンドで開始しました",
+                "model_name": "neural_cf"
+            }
+        )
+
     except HTTPException:
         raise
     except Exception as e:
