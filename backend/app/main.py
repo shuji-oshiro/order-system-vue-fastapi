@@ -6,6 +6,8 @@ from backend.app.api.auth import routes as auth_routes
 from backend.app.utils.logging_config import setup_logging, get_logger
 from backend.app.middleware.logging_middleware import LoggingMiddleware, MetricsMiddleware
 from backend.app.api import menu_api, order_api, category_api, menulist_api, voice_api, monitoring_api,recommend_api
+from backend.app.service.ai_training import ai_training_api
+
 
 # ログシステムを初期化
 setup_logging()
@@ -45,6 +47,7 @@ app.include_router(category_api.router, prefix="/category", tags=["category"])
 app.include_router(auth_routes.router, prefix="/auth", tags=["auth"])
 app.include_router(monitoring_api.router, prefix="/monitoring", tags=["monitoring"])
 app.include_router(recommend_api.router, prefix="/recommend", tags=["recommend"])
+app.include_router(ai_training_api.router, prefix="/ai/training", tags=["ai_training"])
 
 # アプリケーション開始ログ
 logger.info("アプリケーションが開始されました")

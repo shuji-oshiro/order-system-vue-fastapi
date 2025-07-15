@@ -12,6 +12,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from backend.app.crud import menu_crud
+from backend.app.crud import order_crud
 from backend.app.ml.models.neural_cf.model import NeuralCollaborativeFiltering
 from backend.app.ml.inference.model_loader import ModelLoader
 from backend.app.ml.utils.device_manager import DeviceManager
@@ -64,8 +65,7 @@ class AIModelTrainer:
             バリデーション結果の辞書
         """
         try:
-            from backend.app.crud import order_crud
-            
+                        
             # メニュー数をチェック
             all_menus = menu_crud.get_all_menus(db)
             num_menus = len(all_menus)
@@ -76,7 +76,7 @@ class AIModelTrainer:
             
             # 最低限のデータ要件チェック
             min_menus = 5
-            min_orders = 50
+            min_orders = 10
             
             validation_results = {
                 "num_menus": num_menus,

@@ -1,10 +1,12 @@
 # backend/test/conftest.py
+import os
 import pytest
 from pathlib import Path
 from sqlalchemy import text
 from backend.app.database.database import engine, Base
 
-
+folder_path = "testdata"
+sample_data_file_path = Path(__file__).parent / folder_path
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -54,9 +56,8 @@ def setup_recommend_orders_testdata():
 def execute_sql_file(sql_filename):
     """SQLファイルを読み込んで実行（最もシンプルな方式）"""
     try:
-        # testdataフォルダのパスを取得
-        test_dir = Path(__file__).parent
-        sql_file_path = test_dir / "testdata" / sql_filename
+        
+        sql_file_path = sample_data_file_path / sql_filename
         
         if not sql_file_path.exists():
             print(f"SQLファイルが見つかりません: {sql_file_path}")
@@ -148,6 +149,13 @@ def test_isolation(request):
     elif "test_auth" in test_file:
         # 認証テストの場合
         pass
+    
+    elif "test_ai_training" in test_file:
+        # AIトレーニングテストの場合
+        cleanup_all_testdata()
+        setup_categories_testdata()
+        setup_menus_testdata()
+        setup_orders_testdata()
 
 
     # 特定のテストで個別の前処理が必要な場合

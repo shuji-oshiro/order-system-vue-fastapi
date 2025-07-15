@@ -5,11 +5,11 @@ AI トレーニング API
 実際のトレーニング処理は内部で実行される
 """
 import logging
-from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
-
+from sqlalchemy.orm import Session
+from typing import Dict, Any, Optional
+from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from backend.app.database.database import get_db
 from backend.app.service.ai_training.ai_model_trainer import AIModelTrainer
 
@@ -26,11 +26,11 @@ class TrainingRequest(BaseModel):
 
 
 # APIルーター
-router = APIRouter(prefix="/ai/training", tags=["AI Training"])
+router = APIRouter()
 
 
 @router.get("/model/info")
-async def get_model_info(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def get_model_info() -> Dict[str, Any]:
     """モデル情報を取得"""
     try:
         trainer = AIModelTrainer()
@@ -77,7 +77,7 @@ async def train_new_model(
     request: TrainingRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> JSONResponse:
     """新規モデルを学習（バックグラウンド処理）"""
     try:
         trainer = AIModelTrainer()
@@ -108,11 +108,14 @@ async def train_new_model(
         
         background_tasks.add_task(train_model)
         
-        return {
-            "status": "accepted",
-            "message": "新規モデルの学習をバックグラウンドで開始しました",
-            "model_name": "neural_cf"
-        }
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "accepted",
+                "message": "新規モデルの学習をバックグラウンドで開始しました",
+                "model_name": "neural_cf"
+            }        
+        )   
         
     except HTTPException:
         raise
