@@ -9,6 +9,8 @@
 *.sln
 *.sw?
 *.log
+.file
+*.db
 
 # 依存ファイル・ビルド成果物
 node_modules/
@@ -33,7 +35,7 @@ file/
 temp.webm
 
 # データファイル（プロジェクト固有）
-data/
+
 
 # PyTorchモデルファイル
 *.pth 
