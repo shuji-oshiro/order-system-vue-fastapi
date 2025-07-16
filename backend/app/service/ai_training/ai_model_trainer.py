@@ -113,9 +113,9 @@ class AIModelTrainer:
                 "message": f"データ検証に失敗しました: {str(e)}"
             }
     
-    def _execute_training(self, db: Session, **kwargs) -> bool:
+    def train_new_model(self, db: Session, **kwargs) -> bool:
         """
-        実際のトレーニングを実行する内部メソッド
+        新規モデルを学習する
         
         Args:
             db: データベースセッション
@@ -135,8 +135,8 @@ class AIModelTrainer:
             
             logging.info("Neural Collaborative Filteringモデルの学習を開始...")
             
-            # モデル初期化（動的初期化対応）
-            model = NeuralCollaborativeFiltering()
+            # モデル初期化（DBセッションを渡して完全に初期化）
+            model = NeuralCollaborativeFiltering(db=db)
             
             # 学習実行
             train_results = model.fit(
@@ -161,18 +161,18 @@ class AIModelTrainer:
             logging.error(f"モデル学習中にエラーが発生: {e}")
             return False
     
-    def train_new_model(self, db: Session, **kwargs) -> bool:
-        """
-        新規モデルを学習する
+    # def train_new_model(self, db: Session, **kwargs) -> bool:
+    #     """
+    #     新規モデルを学習する
         
-        Args:
-            db: データベースセッション
-            **kwargs: 学習パラメータ
+    #     Args:
+    #         db: データベースセッション
+    #         **kwargs: 学習パラメータ
             
-        Returns:
-            bool: 学習成功フラグ
-        """
-        return self._execute_training(db, **kwargs)
+    #     Returns:
+    #         bool: 学習成功フラグ
+    #     """
+    #     return self._execute_training(db, **kwargs)
     
     def retrain_existing_model(self, db: Session, **kwargs) -> bool:
         """
@@ -194,7 +194,7 @@ class AIModelTrainer:
         try:
             # 既存モデルを読み込み
             device = self.device_manager.get_device()
-            model = NeuralCollaborativeFiltering()
+            model = NeuralCollaborativeFiltering(db=db)
             
             # モデル読み込み
             loaded_model = self.model_loader.load_model(model, self.model_name, device=device)
@@ -204,7 +204,7 @@ class AIModelTrainer:
             # 追加学習実行
             train_results = loaded_model.fit(
                 db=db,
-                force_reload=kwargs.get('force_reload', True),
+                # force_reload=kwargs.get('force_reload', True),
                 **kwargs
             )
             

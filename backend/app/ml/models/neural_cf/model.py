@@ -33,22 +33,41 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         num_menus: Optional[int] = None,
         embedding_dim: int = 50,
         hidden_dims: List[int] = [128, 64, 32],
-        dropout_rate: float = 0.2
+        dropout_rate: float = 0.2,
+        db: Optional[Session] = None
     ):
         super().__init__("MenuRelationshipNetwork")
-        
-        self.num_menus = num_menus  # 初期値、後でデータから動的に設定される
-        self.embedding_dim = embedding_dim
-        self.hidden_dims = hidden_dims
-        self.dropout_rate = dropout_rate
         
         # 新しいモジュールのインスタンス
         self.data_cache = DataCache()
         self.preprocessor = MenuDataPreprocessor()
         
-        # Menu Embeddings（データ準備後に初期化される）
-        self.menu1_embedding: Optional[nn.Embedding] = None
-        self.menu2_embedding: Optional[nn.Embedding] = None
+        # num_menusが指定されていない場合はDBから取得
+        if num_menus is None:
+            if db is None:
+                raise ValueError("num_menusまたはdbセッションのいずれかが必要です")
+            from backend.app.crud import menu_crud
+            all_menus = menu_crud.get_all_menus(db)
+            num_menus = len(all_menus)
+            if num_menus == 0:
+                raise ValueError("メニューデータが見つかりません")
+        
+        self.num_menus = num_menus
+        self.embedding_dim = embedding_dim
+        self.hidden_dims = hidden_dims
+        self.dropout_rate = dropout_rate
+        
+        # 設定を保存（モデル保存時に使用）
+        self.config = {
+            "num_menus": self.num_menus,
+            "embedding_dim": self.embedding_dim,
+            "hidden_dims": self.hidden_dims,
+            "dropout_rate": self.dropout_rate
+        }
+        
+        # Menu Embeddings
+        self.menu1_embedding = nn.Embedding(self.num_menus, self.embedding_dim)
+        self.menu2_embedding = nn.Embedding(self.num_menus, self.embedding_dim)
         
         # 特徴量エンコーダー（頻度・時間・カテゴリ類似度用）
         self.feature_encoder = nn.Sequential(
@@ -56,27 +75,6 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
             nn.ReLU(),
             nn.Dropout(dropout_rate * 0.5)
         )
-        
-        # メインネットワーク（メニューエンベッディング + 特徴量）
-        # 初期化は_initialize_embeddings後に行う
-        self.main_network: Optional[nn.Sequential] = None
-        
-        # 初期化フラグ
-        self._embeddings_initialized = False
-        
-        # Move to device
-        self.to(self.device)
-        
-    def _initialize_embeddings(self, num_menus: int):
-        """エンベッディングレイヤーを動的に初期化"""
-        if self._embeddings_initialized and self.num_menus == num_menus:
-            return  # 既に同じサイズで初期化済み
-            
-        self.num_menus = num_menus
-        
-        # Menu Embeddings（2つのメニューをエンベッド）
-        self.menu1_embedding = nn.Embedding(num_menus, self.embedding_dim)
-        self.menu2_embedding = nn.Embedding(num_menus, self.embedding_dim)
         
         # メインネットワーク（メニューエンベッディング + 特徴量）
         layers = []
@@ -96,24 +94,19 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         
         self.main_network = nn.Sequential(*layers)
         
-        # Initialize embeddings
+        # 重みの初期化
         self._init_weights()
         
         # Move to device
         self.to(self.device)
         
-        self._embeddings_initialized = True
-        logging.info(f"エンベッディングレイヤーを初期化: num_menus={num_menus}")
+        logging.info(f"NeuralCollaborativeFilteringモデルを初期化: num_menus={self.num_menus}")
         
     def _init_weights(self):
         """重みの初期化 - Xavier/He初期化を適用"""
-        if not self._embeddings_initialized:
-            return
-            
         # Menu Embeddings: 正規分布での初期化
-        if self.menu1_embedding is not None and self.menu2_embedding is not None:
-            nn.init.normal_(self.menu1_embedding.weight, std=0.01)
-            nn.init.normal_(self.menu2_embedding.weight, std=0.01)
+        nn.init.normal_(self.menu1_embedding.weight, std=0.01)
+        nn.init.normal_(self.menu2_embedding.weight, std=0.01)
         
         # Feature Encoder の重み初期化
         for module in self.feature_encoder:
@@ -122,12 +115,29 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
                 nn.init.zeros_(module.bias)
         
         # Main Network の重み初期化
-        if self.main_network is not None:
-            for module in self.main_network:
-                if isinstance(module, nn.Linear):
-                    nn.init.xavier_uniform_(module.weight)
-                    nn.init.zeros_(module.bias)
+        for module in self.main_network:
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                nn.init.zeros_(module.bias)
         
+    def _update_from_config(self, config: Dict[str, Any]):
+        """
+        保存された設定からモデルを更新（モデル読み込み時に使用）
+        
+        Args:
+            config: 保存されたモデル設定
+        """
+        logging.info(f"設定からモデルを更新: {config}")
+        
+        # 動的パラメータを更新
+        self.num_menus = config.get('num_menus', self.num_menus)
+        self.embedding_dim = config.get('embedding_dim', self.embedding_dim) 
+        self.hidden_dims = config.get('hidden_dims', self.hidden_dims)
+        self.dropout_rate = config.get('dropout_rate', self.dropout_rate)
+        
+        # configも更新
+        self.config.update(config)
+    
     def forward(self, menu1_ids: torch.Tensor, menu2_ids: torch.Tensor, features: torch.Tensor) -> torch.Tensor:
         """
         順伝播: メニュー間の関連度を予測
@@ -140,14 +150,6 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         Returns:
             メニュー間関連度スコア（0-1）
         """
-        if not self._embeddings_initialized:
-            raise RuntimeError("エンベッディングレイヤーが初期化されていません。prepare_dataまたは_initialize_embeddingsを先に呼び出してください。")
-        
-        # 型チェック（実際にはNoneではないことを保証）
-        assert self.menu1_embedding is not None, "menu1_embedding が初期化されていません"
-        assert self.menu2_embedding is not None, "menu2_embedding が初期化されていません"  
-        assert self.main_network is not None, "main_network が初期化されていません"
-        
         # メニューエンベッディング
         menu1_emb = self.menu1_embedding(menu1_ids)
         menu2_emb = self.menu2_embedding(menu2_ids)
@@ -165,7 +167,7 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
     
     def prepare_data(self, db: Optional[Session] = None, force_reload: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        メニュー間の関連性学習用データを準備（新しいモジュールを使用）
+        メニュー間の関連性学習用データを準備
         
         Args:
             db: データベースセッション
@@ -182,17 +184,10 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         if not orders:
             raise ValueError("注文データが見つかりません")
 
-        # 新しい前処理モジュールを使用してデータを準備
+        # 前処理モジュールを使用してデータを準備
         menu1_ids, menu2_ids, features, targets, _ = self.preprocessor.prepare_menu_pairs(orders, db)
         
-        # データから実際のメニュー数を取得してエンベッディングを初期化
-        unique_menu_ids = np.unique(np.concatenate([menu1_ids, menu2_ids]))
-        actual_num_menus = len(unique_menu_ids)
-        
-        # エンベッディングレイヤーを動的に初期化
-        self._initialize_embeddings(actual_num_menus)
-        
-        logging.info(f"エンベッディング初期化完了: メニュー数={actual_num_menus}")
+        logging.info("メニュー関連性データの準備完了")
         
         return menu1_ids, menu2_ids, features, targets, _
     
