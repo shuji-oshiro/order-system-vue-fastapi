@@ -46,8 +46,8 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
             # デバイスを取得
             device = self.device_manager.get_device()
             
-            # モデル初期化（動的初期化対応）
-            self.model = NeuralCollaborativeFiltering()
+            # モデル初期化
+            self.model = NeuralCollaborativeFiltering(db=db)
             
             # 学習済みモデルを読み込み
             logging.info(f"学習済みモデルを読み込み: {self.model_name}/latest.pth")

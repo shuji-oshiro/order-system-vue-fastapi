@@ -221,6 +221,24 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         # データ準備
         menu1_ids, menu2_ids, features, targets, _ = self.prepare_data(db, force_reload=force_reload)
         
+        # #検証用 
+        # ######################
+        # import pandas as pd
+        # df = pd.DataFrame({
+        #     "menu1": menu1_ids,
+        #     "menu2": menu2_ids,
+        #     "freq": features[:, 0],
+        #     "time": features[:, 1],
+        #     "category_sim": features[:, 2],
+        #     "label": targets
+        # })
+
+        # # 関連があると判断された件数上位
+        # positive_pairs = df[df["label"] == 1]
+        # popular_pairs = positive_pairs.groupby(["menu1", "menu2"]).size().reset_index(name="count")
+        
+        # ###################
+
         # 訓練・テストデータの分割
         (menu1_train, menu1_test, 
          menu2_train, menu2_test, 

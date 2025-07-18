@@ -10,6 +10,7 @@ from typing import cast
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 
+from backend.app.models.model import Menu
 from backend.app.ml.data.cache import DataCache
 from backend.app.ml.data.preprocessing import MenuDataPreprocessor
 
@@ -97,9 +98,9 @@ class MenuRecommendationPredictor:
         """
         # 全メニューを候補として取得
         if db is not None:
-            from backend.app.models.model import Menu
+            
             all_menus = db.query(Menu).all()
-            candidate_ids = [menu.menu_id for menu in all_menus if menu.menu_id != base_menu_id]
+            candidate_ids = [menu.id for menu in all_menus if menu.id != base_menu_id]
         else:
             # キャッシュから取得（簡易版）
             orders = self.data_cache.get_cached_orders()
