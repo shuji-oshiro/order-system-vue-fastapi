@@ -12,6 +12,7 @@ from backend.app.crud import menu_crud
 from backend.app.ml.models.neural_cf.model import NeuralCollaborativeFiltering
 from backend.app.ml.inference.model_loader import ModelLoader
 from backend.app.ml.utils.device_manager import DeviceManager
+from backend.app.service.recommendtypes.phase4_complex_scoring_strategy import Phase4ComplexScoringStrategy
 from backend.app.service.recommendtypes.recommend_strategy import RecommendStrategy
 
 class Phase5AIRecommendStrategy(RecommendStrategy):
@@ -124,7 +125,6 @@ class Phase5AIRecommendStrategy(RecommendStrategy):
             推薦するメニューID
         """
         try:
-            from ..recommend_menu import Phase4ComplexScoringStrategy
             fallback_strategy = Phase4ComplexScoringStrategy()
             return fallback_strategy.recommend(menu_id, db)
         except Exception as e:

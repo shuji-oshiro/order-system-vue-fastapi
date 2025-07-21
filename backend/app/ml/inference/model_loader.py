@@ -3,19 +3,23 @@
 
 学習済みモデルの読み込み・保存機能を提供します。
 """
+import os
 import torch
-import torch.nn as nn
 import logging
+import dotenv
+import torch.nn as nn
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+dotenv.load_dotenv()
+AI_MODEL_STORAGE_DIR = os.getenv("AI_MODEL_STORAGE_DIR", "backend/app/ml/saved_models")
 
 class ModelLoader:
     """モデル読み込み・保存クラス"""
-    
-    def __init__(self, model_dir: str = "backend/app/ml/saved_models"):
-        self.model_dir = Path(model_dir)
-        
+       
+    def __init__(self):
+        self.model_dir = Path(AI_MODEL_STORAGE_DIR)
+
     def save_model(
         self, 
         model: nn.Module, 

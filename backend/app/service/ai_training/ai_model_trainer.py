@@ -4,7 +4,6 @@ AI モデル トレーニング専用モジュール
 Neural Collaborative Filtering モデルの学習・再学習・管理を行う
 レコメンド処理とは完全に分離されている
 """
-import os
 import logging
 import shutil
 from typing import Dict, Any, Optional
@@ -13,14 +12,15 @@ from sqlalchemy.orm import Session
 
 from backend.app.crud import menu_crud
 from backend.app.crud import order_crud
-from backend.app.ml.models.neural_cf.model import NeuralCollaborativeFiltering
-from backend.app.ml.inference.model_loader import ModelLoader
 from backend.app.ml.utils.device_manager import DeviceManager
+from backend.app.ml.inference.model_loader import ModelLoader
+from backend.app.ml.models.neural_cf.model import NeuralCollaborativeFiltering
 
 
 class AIModelTrainer:
     """AI モデルの学習・管理を行うクラス"""
-    
+
+   
     def __init__(self):
         self.model_loader = ModelLoader()
         self.device_manager = DeviceManager()

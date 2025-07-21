@@ -35,11 +35,17 @@ async def get_model_info() -> Dict[str, Any]:
     try:
         trainer = AIModelTrainer()
         info = trainer.get_model_info()
+
+        if not info["metadata"]:
+            raise HTTPException(status_code=404, detail="モデル情報が見つかりません")
+
         return {
             "status": "success",
             "data": info
         }
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
         logging.error(f"モデル情報取得エラー: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

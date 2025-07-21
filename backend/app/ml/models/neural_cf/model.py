@@ -4,6 +4,7 @@ PyTorchを使用したディープラーニングベースのレコメンドシ�
 
 リファクタリング後: データ処理、学習、推論ロジックを分離
 """
+import os
 import torch
 import logging
 import numpy as np
@@ -13,8 +14,10 @@ from typing import List, Dict, Any, Tuple, Optional
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
+from backend.app.crud import menu_crud
 from backend.app.ml.data.cache import DataCache
 from backend.app.ml.training.trainer import ModelTrainer
+from backend.app.ml.inference.model_loader import ModelLoader
 from backend.app.ml.data.preprocessing import MenuDataPreprocessor
 from backend.app.ml.base.py_torch_base_model import PyTorchBaseModel
 from backend.app.ml.inference.predictor import MenuRecommendationPredictor
@@ -46,7 +49,7 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         if num_menus is None:
             if db is None:
                 raise ValueError("num_menusまたはdbセッションのいずれかが必要です")
-            from backend.app.crud import menu_crud
+            
             all_menus = menu_crud.get_all_menus(db)
             num_menus = len(all_menus)
             if num_menus == 0:
@@ -368,9 +371,8 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
     def save_model(self, path: str) -> None:
         """モデルを保存する（基底クラスの抽象メソッド実装）"""
         # ModelLoaderを使用した保存に置き換え
-        from backend.app.ml.inference.model_loader import ModelLoader
-        loader = ModelLoader()
-        import os
+        
+        loader = ModelLoader()        
         model_name = os.path.basename(os.path.dirname(path))
         loader.save_model(self, model_name)
         self.is_trained = True
@@ -378,9 +380,7 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
     def load_model(self, path: str) -> None:
         """モデルを読み込む（基底クラスの抽象メソッド実装）"""
         # ModelLoaderを使用した読み込みに置き換え
-        from backend.app.ml.inference.model_loader import ModelLoader
         loader = ModelLoader()
-        import os
         model_name = os.path.basename(os.path.dirname(path))
         loader.load_model(self, model_name)
         self.is_trained = True
