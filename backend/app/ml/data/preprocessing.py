@@ -11,6 +11,7 @@ import pandas as pd
 from typing import List, Dict, Any, Tuple, Optional
 from sklearn.preprocessing import LabelEncoder
 from sqlalchemy.orm import Session
+from backend.app.crud.order_crud import get_all_orders_for_ml_training  
 
 from backend.app.models.model import Menu
 
@@ -23,7 +24,7 @@ class MenuDataPreprocessor:
         
     def prepare_menu_pairs(
         self, 
-        orders: List[Any], 
+        # orders: List[Any], 
         db: Optional[Session] = None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -38,14 +39,42 @@ class MenuDataPreprocessor:
         """
         logging.info("メニュー関連性データの準備を開始...")
         
-        if not orders:
-            raise ValueError("注文データが見つかりません")
+        # if not orders:
+        #     raise ValueError("注文データが見つかりません")
 
+        
         # メニュー情報を取得（カテゴリ情報含む）
-        menu_categories = self._get_menu_categories(orders, db)
+        # menu_categories = self._get_menu_categories(orders, db)
 
         # DataFrameに変換
-        df = self._create_orders_dataframe(orders, menu_categories)
+        # df = self._create_orders_dataframe(orders, menu_categories)
+
+        if db is None:
+            raise ValueError("データベースセッションが必要です")
+        
+        orders = get_all_orders_for_ml_training(db= db)
+
+        # OrderSchemaをDataFrameに変換
+        order_data = []
+        for order in orders:
+            order_data.append({
+                'seat_id': order.seat_id,
+                'menu_id': order.menu_id,
+                'quantity': order.order_cnt,
+                'order_datetime': order.order_date,
+                'hour': order.order_date.hour if order.order_date else 12,
+                'category_id': order.menu.category_id if order.menu and hasattr(order.menu, 'category_id') else 1,
+                'category_name': order.menu.category.name if order.menu and hasattr(order.menu, 'category') and order.menu.category else '',
+                'menu_name': order.menu.name if order.menu else '',
+                'menu_price': order.menu.price if order.menu else 0
+            })
+        
+        if not order_data:
+            raise ValueError("有効な注文データが見つかりません")
+            
+        df = pd.DataFrame(order_data)
+        logging.info(f"DataFrameに変換された注文データ: {len(order_data)}件")
+
         
         # 座席IDごとに注文されたメニューをグループ化
         seat_menus = df.groupby('seat_id')['menu_id'].apply(list).to_dict()
@@ -59,73 +88,73 @@ class MenuDataPreprocessor:
         # 全データを結合して特徴量とターゲットを準備
         return self._finalize_training_data(menu_pairs, negative_pairs, df)
     
-    def _get_menu_categories(self, orders: List[Any], db: Optional[Session] = None) -> Dict[int, int]:
-        """メニューカテゴリ情報を効率的に取得"""
-        menu_categories = {}
-        missing_menu_ids = set()
+    # def _get_menu_categories(self, orders: List[Any], db: Optional[Session] = None) -> Dict[int, int]:
+    #     """メニューカテゴリ情報を効率的に取得"""
+    #     menu_categories = {}
+    #     missing_menu_ids = set()
         
-        # 1. 注文データからメニュー情報を抽出（Eagerロードされている場合）
-        for order in orders:
-            if hasattr(order, 'menu') and order.menu and hasattr(order.menu, 'category_id'):
-                menu_categories[order.menu_id] = order.menu.category_id
-            else:
-                missing_menu_ids.add(order.menu_id)
+    #     # 1. 注文データからメニュー情報を抽出（Eagerロードされている場合）
+    #     for order in orders:
+    #         if hasattr(order, 'menu') and order.menu and hasattr(order.menu, 'category_id'):
+    #             menu_categories[order.menu_id] = order.menu.category_id
+    #         else:
+    #             missing_menu_ids.add(order.menu_id)
         
-        # 2. 不足しているメニュー情報のみをDBから取得
-        if missing_menu_ids and db is not None:
-            logging.info(f"DBから不足しているメニュー情報を取得: {len(missing_menu_ids)}件")
-            missing_menus = db.query(Menu).filter(Menu.menu_id.in_(missing_menu_ids)).all()
-            for menu in missing_menus:
-                menu_categories[menu.menu_id] = menu.category_id
-                missing_menu_ids.discard(menu.menu_id)
+    #     # 2. 不足しているメニュー情報のみをDBから取得
+    #     if missing_menu_ids and db is not None:
+    #         logging.info(f"DBから不足しているメニュー情報を取得: {len(missing_menu_ids)}件")
+    #         missing_menus = db.query(Menu).filter(Menu.menu_id.in_(missing_menu_ids)).all()
+    #         for menu in missing_menus:
+    #             menu_categories[menu.menu_id] = menu.category_id
+    #             missing_menu_ids.discard(menu.menu_id)
         
-        # 3. それでも見つからないメニューに対する警告
-        if missing_menu_ids:
-            logging.warning(f"メニュー情報が見つからないメニューID: {missing_menu_ids}")
-            # デフォルトカテゴリを割り当て
-            for menu_id in missing_menu_ids:
-                menu_categories[menu_id] = 0  # デフォルトカテゴリ
+    #     # 3. それでも見つからないメニューに対する警告
+    #     if missing_menu_ids:
+    #         logging.warning(f"メニュー情報が見つからないメニューID: {missing_menu_ids}")
+    #         # デフォルトカテゴリを割り当て
+    #         for menu_id in missing_menu_ids:
+    #             menu_categories[menu_id] = 0  # デフォルトカテゴリ
         
-        logging.info(f"メニューカテゴリ情報取得完了: {len(menu_categories)}件")
-        return menu_categories
+    #     logging.info(f"メニューカテゴリ情報取得完了: {len(menu_categories)}件")
+    #     return menu_categories
     
-    def _create_orders_dataframe(self, orders: List[Any], menu_categories: Dict[int, int]) -> pd.DataFrame:
-        """注文データをDataFrameに変換"""
-        order_data = []
+    # def _create_orders_dataframe(self, orders: List[Any], menu_categories: Dict[int, int]) -> pd.DataFrame:
+    #     """注文データをDataFrameに変換"""
+    #     order_data = []
         
-        for order in orders:
-            # 必須フィールドのチェック
-            if not hasattr(order, 'menu_id') or not hasattr(order, 'seat_id'):
-                logging.warning(f"無効な注文データをスキップ: {order}")
-                continue
+    #     for order in orders:
+    #         # 必須フィールドのチェック
+    #         if not hasattr(order, 'menu_id') or not hasattr(order, 'seat_id'):
+    #             logging.warning(f"無効な注文データをスキップ: {order}")
+    #             continue
                 
-            # メニューのカテゴリIDを取得
-            category_id = menu_categories.get(order.menu_id, 0)  # デフォルト値0
+    #         # メニューのカテゴリIDを取得
+    #         category_id = menu_categories.get(order.menu_id, 0)  # デフォルト値0
             
-            # 注文時刻の処理
-            order_hour = 12  # デフォルト値
-            if hasattr(order, 'order_date') and order.order_date:
-                order_hour = order.order_date.hour
+    #         # 注文時刻の処理
+    #         order_hour = 12  # デフォルト値
+    #         if hasattr(order, 'order_date') and order.order_date:
+    #             order_hour = order.order_date.hour
             
-            # 注文数量の処理
-            quantity = 1  # デフォルト値
-            if hasattr(order, 'order_cnt') and order.order_cnt:
-                quantity = order.order_cnt
+    #         # 注文数量の処理
+    #         quantity = 1  # デフォルト値
+    #         if hasattr(order, 'order_cnt') and order.order_cnt:
+    #             quantity = order.order_cnt
             
-            order_data.append({
-                'seat_id': order.seat_id,
-                'menu_id': order.menu_id,
-                'quantity': quantity,
-                'order_datetime': getattr(order, 'order_date', None),
-                'hour': order_hour,
-                'category_id': category_id
-            })
+    #         order_data.append({
+    #             'seat_id': order.seat_id,
+    #             'menu_id': order.menu_id,
+    #             'quantity': quantity,
+    #             'order_datetime': getattr(order, 'order_date', None),
+    #             'hour': order_hour,
+    #             'category_id': category_id
+    #         })
         
-        if not order_data:
-            raise ValueError("有効な注文データが見つかりません")
+    #     if not order_data:
+    #         raise ValueError("有効な注文データが見つかりません")
             
-        logging.info(f"DataFrameに変換された注文データ: {len(order_data)}件")
-        return pd.DataFrame(order_data)
+    #     logging.info(f"DataFrameに変換された注文データ: {len(order_data)}件")
+    #     return pd.DataFrame(order_data)
     
     def _build_positive_pairs(self, df: pd.DataFrame, seat_menus: Dict[int, List[int]]) -> List[Dict[str, Any]]:
         """ポジティブペア（共起するメニューペア）を構築"""

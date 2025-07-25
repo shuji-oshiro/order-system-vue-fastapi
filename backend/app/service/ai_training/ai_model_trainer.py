@@ -134,7 +134,7 @@ class AIModelTrainer:
             force_reload = kwargs.get('force_reload', True)
             
             logging.info("Neural Collaborative Filteringモデルの学習を開始...")
-            
+
             # モデル初期化（DBセッションを渡して完全に初期化）
             model = NeuralCollaborativeFiltering(db=db)
             

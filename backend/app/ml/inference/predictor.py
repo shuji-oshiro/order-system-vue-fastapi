@@ -97,17 +97,23 @@ class MenuRecommendationPredictor:
             推薦メニューのリスト
         """
         # 全メニューを候補として取得
-        if db is not None:
+        if db is None:
+            logging.error("データベースセッションが提供されていません")
+            return []
+        all_menus = db.query(Menu).all()
+        candidate_ids = [menu.id for menu in all_menus if menu.id != base_menu_id]
+        
+        # if db is not None:
             
-            all_menus = db.query(Menu).all()
-            candidate_ids = [menu.id for menu in all_menus if menu.id != base_menu_id]
-        else:
-            # キャッシュから取得（簡易版）
-            orders = self.data_cache.get_cached_orders()
-            if orders:
-                candidate_ids = list(set(order.menu_id for order in orders if order.menu_id != base_menu_id))
-            else:
-                raise ValueError("推薦に必要なデータが不足しています")
+        #     all_menus = db.query(Menu).all()
+        #     candidate_ids = [menu.id for menu in all_menus if menu.id != base_menu_id]
+        # else:
+        #     # キャッシュから取得（簡易版）
+        #     orders = self.data_cache.get_cached_orders()
+        #     if orders:
+        #         candidate_ids = list(set(order.menu_id for order in orders if order.menu_id != base_menu_id))
+        #     else:
+        #         raise ValueError("推薦に必要なデータが不足しています")
         
         # 除外メニューを削除
         if exclude_menu_ids:
@@ -125,18 +131,19 @@ class MenuRecommendationPredictor:
         candidate_menu_ids: List[int],
         db: Optional[Session] = None
     ) -> Dict[int, Dict[str, Any]]:
+        
         """推論用の特徴量を準備"""
         # 注文データを取得
-        if db is not None:
-            from backend.app.crud import order_crud
-            orders = order_crud.get_all_orders(db)
-        else:
-            orders = self.data_cache.get_cached_orders()
-            if not orders:
-                raise ValueError("推論に必要な注文データがありません")
+        # if db is not None:
+        #     from backend.app.crud import order_crud
+        #     orders = order_crud.get_all_orders(db)
+        # else:
+        #     orders = self.data_cache.get_cached_orders()
+        #     if not orders:
+        #         raise ValueError("推論に必要な注文データがありません")
         
-        # データ前処理
-        menu1_ids, menu2_ids, features, targets, _ = self.preprocessor.prepare_menu_pairs(orders, db)
+        # # データ前処理
+        # menu1_ids, menu2_ids, features, targets, _ = self.preprocessor.prepare_menu_pairs(orders, db)
         
         # 基準メニューのエンコード値を取得
         try:

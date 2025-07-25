@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Tuple, Optional
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
-from backend.app.crud import menu_crud
+from backend.app.crud import menu_crud,order_crud
 from backend.app.ml.data.cache import DataCache
 from backend.app.ml.training.trainer import ModelTrainer
 from backend.app.ml.inference.model_loader import ModelLoader
@@ -45,15 +45,15 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         self.data_cache = DataCache()
         self.preprocessor = MenuDataPreprocessor()
         
-        # num_menusが指定されていない場合はDBから取得
-        if num_menus is None:
-            if db is None:
-                raise ValueError("num_menusまたはdbセッションのいずれかが必要です")
+
+        # 注文情報を取得する
+        if db is None:
+            raise ValueError("データベースセッションが必要です")
             
-            all_menus = menu_crud.get_all_menus(db)
-            num_menus = len(all_menus)
-            if num_menus == 0:
-                raise ValueError("メニューデータが見つかりません")
+        all_menus = menu_crud.get_all_menus(db)
+        num_menus = len(all_menus)
+        if num_menus == 0:
+            raise ValueError("メニューデータが見つかりません")
         
         self.num_menus = num_menus
         self.embedding_dim = embedding_dim
@@ -182,14 +182,15 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         logging.info("メニュー関連性データの準備を開始...")
         
         # データキャッシュからオーダーを取得
-        orders = self.data_cache.get_cached_orders(db, force_reload)
+        # orders = self.data_cache.get_cached_orders(db, force_reload)
         
-        if not orders:
-            raise ValueError("注文データが見つかりません")
+        # if not orders:
+            # raise ValueError("注文データが見つかりません")
 
         # 前処理モジュールを使用してデータを準備
-        menu1_ids, menu2_ids, features, targets, _ = self.preprocessor.prepare_menu_pairs(orders, db)
-        
+        # menu1_ids, menu2_ids, features, targets, _ = self.preprocessor.prepare_menu_pairs(orders, db)
+        menu1_ids, menu2_ids, features, targets, _ = self.preprocessor.prepare_menu_pairs(db)
+
         logging.info("メニュー関連性データの準備完了")
         
         return menu1_ids, menu2_ids, features, targets, _

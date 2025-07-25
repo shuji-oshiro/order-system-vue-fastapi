@@ -2,20 +2,22 @@ from typing import Optional, List
 from pydantic import Field, field_validator, ConfigDict
 from decimal import Decimal
 from .baseSchema import BaseSchema
+from .category_schema import CategoryBase
 
 
-class CategoryBase(BaseSchema):
-    """カテゴリ基本情報"""
-    name: str = Field(..., description="カテゴリ名")
-    description: Optional[str] = Field(None, description="カテゴリの説明")
+# class CategoryBase(BaseSchema):
+#     """カテゴリ基本情報"""
+#     name: str = Field(..., description="カテゴリ名")
+#     description: Optional[str] = Field(None, description="カテゴリの説明")
 
 
 class MenuBase(BaseSchema):
     """メニューの基本スキーマ"""
     name: str = Field(..., min_length=1, max_length=100, description="メニュー名")
-    price: int = Field(..., ge=0, le=999999, description="価格（円）")
+    # price: int = Field(..., ge=0, le=999999, description="価格（円）")
+    price: int = Field(..., description="価格（円）")
     description: Optional[str] = Field(None, max_length=500, description="メニューの説明")
-    search_text: str = Field(..., min_length=1, max_length=200, description="検索テキスト")
+    search_text: str = Field(..., min_length=1, max_length=50, description="検索テキスト")
     
     @field_validator('name')
     @classmethod
@@ -62,7 +64,6 @@ class MenuIn(MenuBase):
 
 class MenuOut(MenuBase):
     """メニュー出力スキーマ"""
-    model_config = ConfigDict(from_attributes=True)
     
     id: int = Field(..., description="メニューID")
     category_id: int = Field(..., description="カテゴリID")
@@ -125,7 +126,6 @@ class MenuUpdateLegacy(BaseSchema):
 
 class MenuOut_SP(BaseSchema):
     """カテゴリ別メニューリスト出力スキーマ"""
-    model_config = ConfigDict(from_attributes=True)
     
     category_id: int = Field(..., description="カテゴリID")
     category_name: str = Field(..., description="カテゴリ名")
@@ -134,7 +134,6 @@ class MenuOut_SP(BaseSchema):
 
 class MenuSearchResult(BaseSchema):
     """メニュー検索結果スキーマ"""
-    model_config = ConfigDict(from_attributes=True)
     
     menu: MenuOut = Field(..., description="メニュー情報")
     score: float = Field(..., ge=0.0, le=1.0, description="検索スコア")
@@ -156,7 +155,6 @@ class MenuBulkCreateRequest(BaseSchema):
 
 class MenuBulkCreateResponse(BaseSchema):
     """メニュー一括作成レスポンススキーマ"""
-    model_config = ConfigDict(from_attributes=True)
     
     created_count: int = Field(..., description="作成されたメニュー数")
     menus: List[MenuOut] = Field(..., description="作成されたメニューリスト")

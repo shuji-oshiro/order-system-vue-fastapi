@@ -2,7 +2,7 @@
 from fastapi import HTTPException
 import backend.app.models.model as model
 from sqlalchemy.orm import Session
-from backend.app.schemas.order_schema import OrderOut, OrderIn
+from backend.app.schemas.order_schema import OrderOut, OrderIn, OrderSchema
 
 
 # 注文情報のCRUD操作を行うモジュール
@@ -167,6 +167,17 @@ def get_all_orders(db: Session):
     全ての注文データを取得する（ML学習用）
     """
     return db.query(model.Order).all()
+
+
+
+# ML学習用: 全注文データを取得
+def get_all_orders_for_ml_training(db: Session) -> list[OrderSchema]:
+    """
+    全ての注文データを取得する（ML学習用 & スキーマ対応版）
+    """
+    orders = db.query(model.Order).all()
+    return [OrderSchema.model_validate(order) for order in orders]
+
 
 
 # 注文情報の追加
