@@ -131,42 +131,21 @@ class MenuRecommendationPredictor:
         candidate_menu_ids: List[int],
         db: Optional[Session] = None
     ) -> Dict[int, Dict[str, Any]]:
-        
         """推論用の特徴量を準備"""
-        # 注文データを取得
-        # if db is not None:
-        #     from backend.app.crud import order_crud
-        #     orders = order_crud.get_all_orders(db)
-        # else:
-        #     orders = self.data_cache.get_cached_orders()
-        #     if not orders:
-        #         raise ValueError("推論に必要な注文データがありません")
         
-        # # データ前処理
-        # menu1_ids, menu2_ids, features, targets, _ = self.preprocessor.prepare_menu_pairs(orders, db)
+        # エンコーダーが初期化されていない場合、学習データで初期化
+        if not hasattr(self.preprocessor.menu_encoder, 'classes_'):
+            logging.info("メニューエンコーダーを初期化します")
+            self._initialize_encoder(db)
         
         # 基準メニューのエンコード値を取得
-        try:
-            result = self.preprocessor.menu_encoder.transform([base_menu_id])
-            base_encoded = cast(np.ndarray, result)[0]
-
-        except ValueError:
-            # 未知のメニューID
-            logging.warning(f"未知の基準メニューID: {base_menu_id}")
-            base_encoded = 0
+        base_encoded = self._safe_encode_menu(base_menu_id)
         
         # 候補メニューの特徴量を準備
         features_data = {}
         
         for candidate_id in candidate_menu_ids:
-            try:
-                result = self.preprocessor.menu_encoder.transform([candidate_id])
-                candidate_encoded = cast(np.ndarray, result)[0]
-
-            except ValueError:
-                # 未知のメニューID
-                logging.warning(f"未知の候補メニューID: {candidate_id}")
-                candidate_encoded = 0
+            candidate_encoded = self._safe_encode_menu(candidate_id)
             
             # デフォルト特徴量（実際の計算は後で改善）
             default_features = [0.5, 0.5, 0.0]  # freq_sim, time_sim, category_sim
@@ -178,3 +157,21 @@ class MenuRecommendationPredictor:
             }
         
         return features_data
+    
+    def _safe_encode_menu(self, menu_id: int) -> int:
+        """メニューIDを安全にエンコード（未知IDは最大値+1を返す）"""
+        try:
+            result = self.preprocessor.menu_encoder.transform([menu_id])
+            return cast(np.ndarray, result)[0]
+        except ValueError:
+            # 未知のメニューID: 学習済みメニュー数を返す（新しいインデックス）
+            logging.warning(f"未知のメニューID {menu_id} を検出、新しいエンコード値を割り当て")
+            return len(self.preprocessor.menu_encoder.classes_)
+    
+    def _initialize_encoder(self, db: Optional[Session] = None):
+        """エンコーダーを初期化（学習データから）"""
+        if db is None:
+            raise ValueError("エンコーダー初期化にはデータベースセッションが必要です")
+        
+        # 学習時と同じ方法でメニューエンコーダーを初期化
+        self.preprocessor.prepare_menu_pairs(db=db)

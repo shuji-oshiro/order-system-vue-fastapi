@@ -45,17 +45,19 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         self.data_cache = DataCache()
         self.preprocessor = MenuDataPreprocessor()
         
-
-        # 注文情報を取得する
-        if db is None:
-            raise ValueError("データベースセッションが必要です")
-            
-        all_menus = menu_crud.get_all_menus(db)
-        num_menus = len(all_menus)
-        if num_menus == 0:
-            raise ValueError("メニューデータが見つかりません")
+        # num_menusの決定（優先順位: 引数 > DB > エラー）
+        if num_menus is not None:
+            self.num_menus = num_menus
+            logging.info(f"引数からメニュー数を設定: {num_menus}")
+        elif db is not None:
+            all_menus = menu_crud.get_all_menus(db)
+            self.num_menus = len(all_menus)
+            if self.num_menus == 0:
+                raise ValueError("メニューデータが見つかりません")
+            logging.info(f"DBからメニュー数を取得: {self.num_menus}")
+        else:
+            raise ValueError("num_menusまたはdbセッションが必要です")
         
-        self.num_menus = num_menus
         self.embedding_dim = embedding_dim
         self.hidden_dims = hidden_dims
         self.dropout_rate = dropout_rate
@@ -106,10 +108,10 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
         logging.info(f"NeuralCollaborativeFilteringモデルを初期化: num_menus={self.num_menus}")
         
     def _init_weights(self):
-        """重みの初期化 - Xavier/He初期化を適用"""
-        # Menu Embeddings: 正規分布での初期化
-        nn.init.normal_(self.menu1_embedding.weight, std=0.01)
-        nn.init.normal_(self.menu2_embedding.weight, std=0.01)
+        """重みの初期化 - レコメンドシステムに適した初期化"""
+        # Menu Embeddings: Xavier初期化（推薦系では一般的）
+        nn.init.xavier_uniform_(self.menu1_embedding.weight)
+        nn.init.xavier_uniform_(self.menu2_embedding.weight)
         
         # Feature Encoder の重み初期化
         for module in self.feature_encoder:
@@ -117,7 +119,7 @@ class NeuralCollaborativeFiltering(PyTorchBaseModel):
                 nn.init.xavier_uniform_(module.weight)
                 nn.init.zeros_(module.bias)
         
-        # Main Network の重み初期化
+        # Main Network の重み初期化  
         for module in self.main_network:
             if isinstance(module, nn.Linear):
                 nn.init.xavier_uniform_(module.weight)

@@ -1,6 +1,7 @@
 # backend/test/conftest.py
 import os
 import pytest
+import shutil
 from pathlib import Path
 from sqlalchemy import text
 from backend.app.database.database import engine, Base
@@ -28,6 +29,29 @@ def setup_test_data(request):
         except Exception as cleanup_error:
             print(f"ファイル終了時のクリーンアップ中にエラーが発生しました: {cleanup_error}")
 
+
+
+def cleanup_saved_models():
+    """学習済みモデルをクリーンアップ（削除）"""
+    try:
+        # 学習済みモデルの保存ディレクトリパス
+        project_root = Path(__file__).parent.parent
+        saved_models_path = project_root / "app" / "ml" / "saved_models"
+        
+        if saved_models_path.exists():
+            # saved_modelsディレクトリ内の全ファイル・フォルダを削除
+            for item in saved_models_path.iterdir():
+                if item.is_file():
+                    item.unlink()
+                    print(f"削除されたモデルファイル: {item}")
+                elif item.is_dir():
+                    shutil.rmtree(item)
+                    print(f"削除されたモデルディレクトリ: {item}")
+            print("学習済みモデルをクリーンアップしました")
+        else:
+            print("saved_modelsディレクトリが存在しません")
+    except Exception as e:
+        print(f"学習済みモデルのクリーンアップ中にエラー: {e}")
 
 
 def cleanup_all_testdata():
@@ -152,10 +176,12 @@ def test_isolation(request):
     
     elif "test_ai_training" in test_file:
         # AIトレーニングテストの場合
+        print(f"{test_name} - AIトレーニング用データと学習済みモデルのクリーンアップ")
+        cleanup_saved_models()  # 学習済みモデルを削除
         cleanup_all_testdata()
         setup_categories_testdata()
         setup_menus_testdata()
-        setup_orders_testdata()
+        setup_recommend_orders_testdata()
 
 
     # 特定のテストで個別の前処理が必要な場合
